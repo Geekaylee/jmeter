@@ -61,10 +61,10 @@ public class ConnectTimeOverTimeGraphConsumer extends AbstractOverTimeGraphConsu
      *            the property key
      * @param defaultValue
      *            the default value
-     * @param serieName Serie name
+     * @param serieName Series name
      * @return the group info
      */
-    private GroupInfo createPercentileGroupInfo(String propertyKey, int defaultValue, String serieName) {
+    private GroupInfo createPercentileGroupInfo(String propertyKey, int defaultValue, String seriesName) {
         int property = JMeterUtils.getPropDefault(propertyKey, defaultValue);
         PercentileAggregatorFactory factory = new PercentileAggregatorFactory();
         factory.setPercentileIndex(property);
