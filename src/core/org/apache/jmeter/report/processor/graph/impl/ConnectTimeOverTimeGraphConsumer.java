@@ -61,7 +61,8 @@ public class ConnectTimeOverTimeGraphConsumer extends AbstractOverTimeGraphConsu
      *            the property key
      * @param defaultValue
      *            the default value
-     * @param serieName Series name
+
+     * @param seriesName Series name
      * @return the group info
      */
     private GroupInfo createPercentileGroupInfo(String propertyKey, int defaultValue, String seriesName) {

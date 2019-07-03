@@ -42,7 +42,7 @@ public class ResponseTimeVSRequestGraphConsumer extends
     private static final String PERCENTILE_FORMAT = "%dth percentile";
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.apache.jmeter.report.processor.graph.AbstractGraphConsumer#
      * createKeysSelector()
      */
@@ -82,7 +82,7 @@ public class ResponseTimeVSRequestGraphConsumer extends
     }
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.apache.jmeter.report.csv.processor.impl.AbstractGraphConsumer#
      * createGroupInfos()
      */

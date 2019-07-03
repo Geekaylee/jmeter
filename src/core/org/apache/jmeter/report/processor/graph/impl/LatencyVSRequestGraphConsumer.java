@@ -43,7 +43,7 @@ public class LatencyVSRequestGraphConsumer extends
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.apache.jmeter.report.processor.graph.AbstractGraphConsumer#
      * createKeysSelector()
      */
@@ -84,7 +84,7 @@ public class LatencyVSRequestGraphConsumer extends
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.apache.jmeter.report.csv.processor.impl.AbstractGraphConsumer#
      * createGroupInfos()
      */
