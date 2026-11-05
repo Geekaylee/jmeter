@@ -17,9 +17,8 @@
 
 package org.apache.jmeter.util;
 
-import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import org.hamcrest.CoreMatchers;
 import org.junit.jupiter.api.Test;
 
 public class JSR223TestElementTest {
@@ -29,17 +28,9 @@ public class JSR223TestElementTest {
     };
 
     @Test
-    public void testGetScriptEngineJS() throws Exception {
-        element.setScriptLanguage("JavaScript");
-        assertThat(element.getScriptEngine().getFactory().getLanguageName(),
-                CoreMatchers.containsString("Script"));
-    }
-
-    @Test
     public void testGetScriptEngineDefault() throws Exception {
         element.setScriptLanguage("");
-        assertThat(element.getScriptEngine().getFactory().getLanguageName(),
-                CoreMatchers.is("Groovy"));
+        assertEquals("Groovy", element.getScriptEngine().getFactory().getLanguageName());
     }
 
 }

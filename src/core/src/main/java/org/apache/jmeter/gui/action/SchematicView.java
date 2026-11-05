@@ -39,18 +39,24 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.stream.StreamResult;
 import javax.xml.transform.stream.StreamSource;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.gui.GuiPackage;
 import org.apache.jmeter.gui.plugin.MenuCreator;
 import org.apache.jmeter.util.JMeterUtils;
 import org.apache.jorphan.collections.HashTree;
+import org.apache.jorphan.util.StringUtilities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.auto.service.AutoService;
 
 /**
  * Schematic view of Test Plan
  * @since 5.1
  */
+@AutoService({
+        Command.class,
+        MenuCreator.class
+})
 public class SchematicView extends AbstractAction implements MenuCreator {
     private static final Logger log = LoggerFactory.getLogger(SchematicView.class);
     private static final String DEFAULT_XSL_FILE =
@@ -71,7 +77,7 @@ public class SchematicView extends AbstractAction implements MenuCreator {
                     "net.sf.saxon.BasicTransformerFactory", Thread.currentThread().getContextClassLoader());
             factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
             Source xslt;
-            if (!StringUtils.isEmpty(DEFAULT_XSL_FILE)) {
+            if (StringUtilities.isNotEmpty(DEFAULT_XSL_FILE)) {
                 log.info("Will use file {} for Schematic View generation", DEFAULT_XSL_FILE);
                 xslt = new StreamSource(new File(DEFAULT_XSL_FILE));
             } else {

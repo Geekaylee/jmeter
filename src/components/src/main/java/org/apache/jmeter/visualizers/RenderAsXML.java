@@ -53,6 +53,9 @@ import org.w3c.dom.NodeList;
 import org.w3c.tidy.Tidy;
 import org.xml.sax.SAXException;
 
+import com.google.auto.service.AutoService;
+
+@AutoService(ResultRenderer.class)
 public class RenderAsXML extends SamplerResultTab
     implements ResultRenderer {
 
@@ -111,8 +114,8 @@ public class RenderAsXML extends SamplerResultTab
     private static class ExpandPopupMenu extends JPopupMenu implements ActionListener {
 
         private static final long serialVersionUID = 1L;
-        private JMenuItem expand;
-        private JMenuItem collapse;
+        private final JMenuItem expand;
+        private final JMenuItem collapse;
         private JTree tree;
 
         ExpandPopupMenu() {
@@ -149,7 +152,7 @@ public class RenderAsXML extends SamplerResultTab
         }
 
         @SuppressWarnings("JdkObsolete")
-        private void applyToChildren(TreePath parent, Consumer<TreePath> method) {
+        private static void applyToChildren(TreePath parent, Consumer<? super TreePath> method) {
             TreeNode node = (TreeNode) parent.getLastPathComponent();
             Enumeration<?> e = node.children();
             while (e.hasMoreElements()) {
@@ -160,26 +163,23 @@ public class RenderAsXML extends SamplerResultTab
         }
     }
 
-    /*
-     *
+    /**
      * A Dom tree panel for to display response as tree view author <a
      * href="mailto:d.maung@mdl.com">Dave Maung</a>
      * TODO implement to find any nodes in the tree using TreePath.
-     *
      */
     private static class DOMTreePanel extends JPanel implements MouseListener {
 
         private static final long serialVersionUID = 6871690021183779153L;
 
-        private JTree domJTree;
         private ExpandPopupMenu popupMenu;
 
-        public DOMTreePanel(org.w3c.dom.Document document) {
+        private DOMTreePanel(org.w3c.dom.Document document) {
             super(new GridLayout(1, 0));
             try {
                 Node firstElement = getFirstElement(document);
                 DefaultMutableTreeNode top = new XMLDefaultMutableTreeNode(firstElement);
-                domJTree = new JTree(top);
+                JTree domJTree = new JTree(top);
                 domJTree.getSelectionModel().setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
                 domJTree.setShowsRootHandles(true);
                 domJTree.addMouseListener(this);
@@ -201,7 +201,7 @@ public class RenderAsXML extends SamplerResultTab
          *
          * @param parent {@link Node}
          */
-        private Node getFirstElement(Node parent) {
+        private static Node getFirstElement(Node parent) {
             NodeList childNodes = parent.getChildNodes();
             Node toReturn = parent; // Must return a valid node, or may generate an NPE
             for (int i = 0; i < childNodes.getLength(); i++) {
@@ -241,7 +241,7 @@ public class RenderAsXML extends SamplerResultTab
             /**
              * get the html
              */
-            private String getHTML(String str, String separator, int maxChar) {
+            private static String getHTML(String str, String separator, int maxChar) {
                 StringBuilder strBuf = new StringBuilder("<html><body bgcolor=\"yellow\"><b>"); // $NON-NLS-1$
                 char[] chars = str.toCharArray();
                 for (int i = 0; i < chars.length; i++) {
@@ -249,7 +249,12 @@ public class RenderAsXML extends SamplerResultTab
                     if (i % maxChar == 0 && i != 0) {
                         strBuf.append(separator);
                     }
-                    strBuf.append(encode(chars[i]));
+                    String encoded = encode(chars[i]);
+                    if (encoded != null) {
+                        strBuf.append(encoded);
+                    } else {
+                        strBuf.append(chars[i]);
+                    }
 
                 }
                 strBuf.append("</b></body></html>"); // $NON-NLS-1$
@@ -257,27 +262,14 @@ public class RenderAsXML extends SamplerResultTab
 
             }
 
-            private String encode(char c) {
-                String toReturn = String.valueOf(c);
-                switch (c) {
-                    case '<': // $NON-NLS-1$
-                        toReturn = "&lt;"; // $NON-NLS-1$
-                        break;
-                    case '>': // $NON-NLS-1$
-                        toReturn = "&gt;"; // $NON-NLS-1$
-                        break;
-                    case '\'': // $NON-NLS-1$
-                        toReturn = "&apos;"; // $NON-NLS-1$
-                        break;
-                    case '\"': // $NON-NLS-1$
-                        toReturn = "&quot;"; // $NON-NLS-1$
-                        break;
-                    default:
-                        // ignored
-                        break;
-
-                }
-                return toReturn;
+            private static String encode(char c) {
+                return switch (c) {
+                    case '<' -> "&lt;"; // $NON-NLS-1$
+                    case '>' -> "&gt;"; // $NON-NLS-1$
+                    case '\'' -> "&apos;"; // $NON-NLS-1$
+                    case '\"' -> "&quot;"; // $NON-NLS-1$
+                    default -> null;
+                };
             }
         }
 

@@ -42,7 +42,7 @@ public class BSFPreProcessor extends BSFTestElement implements Cloneable, PrePro
             processFileOrScript(mgr);
         } catch (BSFException e) {
             if (log.isWarnEnabled()) {
-                log.warn("Problem in BSF script. {}", e.toString());
+                log.warn("Problem in BSF element named: '{}'", getName(), e);
             }
         } finally {
             if (mgr != null) {
@@ -52,6 +52,7 @@ public class BSFPreProcessor extends BSFTestElement implements Cloneable, PrePro
     }
 
     @Override
+    @SuppressWarnings("RedundantOverride")
     public Object clone() {
         return super.clone();
     }

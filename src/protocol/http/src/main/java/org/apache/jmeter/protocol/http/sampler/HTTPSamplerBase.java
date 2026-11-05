@@ -17,16 +17,15 @@
 
 package org.apache.jmeter.protocol.http.sampler;
 
-import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.PrintStream;
+import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -41,9 +40,9 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.function.Predicate;
+import java.util.regex.PatternSyntaxException;
 
-import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.config.Argument;
 import org.apache.jmeter.config.Arguments;
 import org.apache.jmeter.config.ConfigTestElement;
@@ -61,7 +60,6 @@ import org.apache.jmeter.protocol.http.parser.LinkExtractorParseException;
 import org.apache.jmeter.protocol.http.parser.LinkExtractorParser;
 import org.apache.jmeter.protocol.http.sampler.ResourcesDownloader.AsynSamplerResultHolder;
 import org.apache.jmeter.protocol.http.util.ConversionUtils;
-import org.apache.jmeter.protocol.http.util.DirectAccessByteArrayOutputStream;
 import org.apache.jmeter.protocol.http.util.EncoderCache;
 import org.apache.jmeter.protocol.http.util.HTTPArgument;
 import org.apache.jmeter.protocol.http.util.HTTPConstants;
@@ -76,20 +74,21 @@ import org.apache.jmeter.testelement.TestElement;
 import org.apache.jmeter.testelement.TestIterationListener;
 import org.apache.jmeter.testelement.TestStateListener;
 import org.apache.jmeter.testelement.ThreadListener;
-import org.apache.jmeter.testelement.property.BooleanProperty;
 import org.apache.jmeter.testelement.property.CollectionProperty;
-import org.apache.jmeter.testelement.property.IntegerProperty;
 import org.apache.jmeter.testelement.property.JMeterProperty;
-import org.apache.jmeter.testelement.property.PropertyIterator;
-import org.apache.jmeter.testelement.property.StringProperty;
-import org.apache.jmeter.testelement.property.TestElementProperty;
+import org.apache.jmeter.testelement.schema.PropertiesAccessor;
+import org.apache.jmeter.testelement.schema.PropertyDescriptor;
 import org.apache.jmeter.threads.JMeterContext;
 import org.apache.jmeter.threads.JMeterContextService;
 import org.apache.jmeter.util.JMeterUtils;
+import org.apache.jorphan.io.DirectAccessByteArrayOutputStream;
+import org.apache.jorphan.util.ExceptionUtils;
 import org.apache.jorphan.util.JOrphanUtils;
+import org.apache.jorphan.util.StringUtilities;
 import org.apache.oro.text.MalformedCachePatternException;
 import org.apache.oro.text.regex.Pattern;
 import org.apache.oro.text.regex.Perl5Matcher;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -161,17 +160,23 @@ public abstract class HTTPSamplerBase extends AbstractSampler
 
     public static final String IMPLEMENTATION = "HTTPSampler.implementation"; // $NON-NLS-1$
 
+    /**
+     * Name of the property which selects the HTTP version of the sampler, see
+     * {@link #setHttpVersion(String)}.
+     *
+     * @since 6.0
+     */
+    public static final String HTTP_VERSION = HTTPSamplerBaseSchema.INSTANCE.getHttpVersion().getName();
+
     public static final String PATH = "HTTPSampler.path"; // $NON-NLS-1$
 
-    public static final String FOLLOW_REDIRECTS = "HTTPSampler.follow_redirects"; // $NON-NLS-1$
+    public static final String FOLLOW_REDIRECTS = HTTPSamplerBaseSchema.INSTANCE.getFollowRedirects().getName();
 
     public static final String AUTO_REDIRECTS = "HTTPSampler.auto_redirects"; // $NON-NLS-1$
 
     public static final String PROTOCOL = "HTTPSampler.protocol"; // $NON-NLS-1$
 
     static final String PROTOCOL_FILE = "file"; // $NON-NLS-1$
-
-    private static final String DEFAULT_PROTOCOL = HTTPConstants.PROTOCOL_HTTP;
 
     public static final String URL = "HTTPSampler.URL"; // $NON-NLS-1$
 
@@ -194,8 +199,6 @@ public abstract class HTTPSamplerBase extends AbstractSampler
 
     public static final int CONCURRENT_POOL_SIZE = 6; // Default concurrent pool size for download embedded resources
 
-    private static final String CONCURRENT_POOL_DEFAULT = Integer.toString(CONCURRENT_POOL_SIZE); // default for concurrent pool
-
     private static final String USER_AGENT = "User-Agent"; // $NON-NLS-1$
 
     //- JMX names
@@ -204,6 +207,18 @@ public abstract class HTTPSamplerBase extends AbstractSampler
 
     private static final int MAX_BYTES_TO_STORE_PER_REQUEST =
             JMeterUtils.getPropDefault("httpsampler.max_bytes_to_store_per_request", 0); // $NON-NLS-1$ // default value: 0 don't truncate
+
+    /**
+     * Maximum number of bytes of a response body that are kept in the sample result, {@code 0}
+     * meaning that the body is stored in full. Transports that read the body themselves can use
+     * this to stop buffering early, instead of materializing a body that
+     * {@link #readResponse(SampleResult, InputStream, long)} would truncate anyway.
+     *
+     * @return the configured limit in bytes
+     */
+    static int getMaxBytesToStorePerRequest() {
+        return MAX_BYTES_TO_STORE_PER_REQUEST;
+    }
 
     private static final int MAX_BUFFER_SIZE =
             JMeterUtils.getPropDefault("httpsampler.max_buffer_size", 65 * 1024); // $NON-NLS-1$
@@ -214,6 +229,7 @@ public abstract class HTTPSamplerBase extends AbstractSampler
     private static final boolean IGNORE_EMBEDDED_RESOURCES_DATA =
             JMeterUtils.getPropDefault("httpsampler.embedded_resources_use_md5", false); // $NON-NLS-1$ // default value: false
 
+    @SuppressWarnings("EnumOrdinal")
     public static final int SOURCE_TYPE_DEFAULT = HTTPSamplerBase.SourceType.HOSTNAME.ordinal();
 
     public static final String DEFAULT_METHOD = HTTPConstants.GET; // $NON-NLS-1$
@@ -242,7 +258,7 @@ public abstract class HTTPSamplerBase extends AbstractSampler
         ));
         String userDefinedMethods = JMeterUtils.getPropDefault(
                 "httpsampler.user_defined_methods", "");
-        if (StringUtils.isNotBlank(userDefinedMethods)) {
+        if (StringUtilities.isNotBlank(userDefinedMethods)) {
             defaultMethods.addAll(Arrays.asList(userDefinedMethods.split("\\s*,\\s*")));
         }
         METHODLIST = Collections.unmodifiableList(defaultMethods);
@@ -250,7 +266,6 @@ public abstract class HTTPSamplerBase extends AbstractSampler
 
     // @see mergeFileProperties
     // Must be private, as the file list needs special handling
-    private static final String FILE_ARGS = "HTTPsampler.Files"; // $NON-NLS-1$
     // MIMETYPE is kept for backward compatibility with old test plans
     private static final String MIMETYPE = "HTTPSampler.mimetype"; // $NON-NLS-1$
     // FILE_NAME is kept for backward compatibility with old test plans
@@ -320,6 +335,9 @@ public abstract class HTTPSamplerBase extends AbstractSampler
     private static final boolean SEPARATE_CONTAINER =
             JMeterUtils.getPropDefault("httpsampler.separate.container", true); // $NON-NLS-1$
 
+    private static final boolean USE_JAVA_REGEX = !JMeterUtils.getPropDefault(
+            "jmeter.regex.engine", "oro").equalsIgnoreCase("oro");
+
     static {
         String[] parsers = JOrphanUtils.split(RESPONSE_PARSERS, " " , true);// returns empty array for null
         for (final String parser : parsers) {
@@ -346,6 +364,16 @@ public abstract class HTTPSamplerBase extends AbstractSampler
 
     protected HTTPSamplerBase() {
         setArguments(new Arguments());
+    }
+
+    @Override
+    public HTTPSamplerBaseSchema getSchema() {
+        return HTTPSamplerBaseSchema.INSTANCE;
+    }
+
+    @Override
+    public PropertiesAccessor<? extends HTTPSamplerBase, ? extends HTTPSamplerBaseSchema> getProps() {
+        return new PropertiesAccessor<>(this, getSchema());
     }
 
     public enum SourceType {
@@ -381,9 +409,9 @@ public abstract class HTTPSamplerBase extends AbstractSampler
         // If there is one file with no parameter name, the file will
         // be sent as post body.
         HTTPFileArg[] files = getHTTPFiles();
-        return (files.length == 1)
-                && (files[0].getPath().length() > 0)
-                && (files[0].getParamName().length() == 0);
+        return files.length == 1
+                && !files[0].getPath().isEmpty()
+                && files[0].getParamName().isEmpty();
     }
 
     /**
@@ -399,10 +427,10 @@ public abstract class HTTPSamplerBase extends AbstractSampler
             return true;
         } else {
             boolean hasArguments = false;
-            for (JMeterProperty jMeterProperty : getArguments()) {
+            for (JMeterProperty jMeterProperty : getArguments().getEnabledArguments()) {
                 hasArguments = true;
                 HTTPArgument arg = (HTTPArgument) jMeterProperty.getObjectValue();
-                if (arg.getName() != null && arg.getName().length() > 0) {
+                if (arg.getName() != null && !arg.getName().isEmpty()) {
                     return false;
                 }
             }
@@ -437,9 +465,10 @@ public abstract class HTTPSamplerBase extends AbstractSampler
         return getDoMultipart() || (files.length>0 && hasNoMissingFile(files) && !getSendFileAsPostBody());
     }
 
-    private boolean hasNoMissingFile(HTTPFileArg[] files) {
+    private static boolean hasNoMissingFile(HTTPFileArg[] files) {
         for (HTTPFileArg httpFileArg : files) {
-            if(StringUtils.isEmpty(httpFileArg.getPath())) {
+            String path = httpFileArg.getPath();
+            if (StringUtilities.isEmpty(path)) {
                 log.warn("File {} is invalid as no path is defined", httpFileArg);
                 return false;
             }
@@ -448,7 +477,7 @@ public abstract class HTTPSamplerBase extends AbstractSampler
     }
 
     public void setProtocol(String value) {
-        setProperty(PROTOCOL, value.toLowerCase(java.util.Locale.ENGLISH));
+        set(getSchema().getProtocol(), value.toLowerCase(java.util.Locale.ENGLISH));
     }
 
     /**
@@ -457,9 +486,9 @@ public abstract class HTTPSamplerBase extends AbstractSampler
      * @return the protocol
      */
     public String getProtocol() {
-        String protocol = getPropertyAsString(PROTOCOL);
-        if (protocol == null || protocol.length() == 0) {
-            return DEFAULT_PROTOCOL;
+        String protocol = getString(getSchema().getProtocol());
+        if (StringUtilities.isEmpty(protocol)) {
+            return HTTPConstants.PROTOCOL_HTTP;
         }
         return protocol;
     }
@@ -493,44 +522,45 @@ public abstract class HTTPSamplerBase extends AbstractSampler
         if (!fullUrl && getOrDelete) {
             int index = path.indexOf(QRY_PFX);
             if (index > -1) {
-                setProperty(PATH, path.substring(0, index));
+
+                set(getSchema().getPath(), path.substring(0, index));
                 // Parse the arguments in querystring, assuming specified encoding for values
                 parseArguments(path.substring(index + 1), contentEncoding);
             } else {
-                setProperty(PATH, path);
+                set(getSchema().getPath(), path);
             }
         } else {
-            setProperty(PATH, path);
+            set(getSchema().getPath(), path);
         }
     }
 
     public String getPath() {
-        String p = getPropertyAsString(PATH);
+        String p = get(getSchema().getPath());
         return encodeSpaces(p);
     }
 
     public void setFollowRedirects(boolean value) {
-        setProperty(new BooleanProperty(FOLLOW_REDIRECTS, value));
+        set(getSchema().getFollowRedirects(), value);
     }
 
     public boolean getFollowRedirects() {
-        return getPropertyAsBoolean(FOLLOW_REDIRECTS);
+        return get(getSchema().getFollowRedirects());
     }
 
     public void setAutoRedirects(boolean value) {
-        setProperty(new BooleanProperty(AUTO_REDIRECTS, value));
+        set(getSchema().getAutoRedirects(), value);
     }
 
     public boolean getAutoRedirects() {
-        return getPropertyAsBoolean(AUTO_REDIRECTS);
+        return get(getSchema().getAutoRedirects());
     }
 
     public void setMethod(String value) {
-        setProperty(METHOD, value);
+        set(getSchema().getMethod(), value);
     }
 
     public String getMethod() {
-        return getPropertyAsString(METHOD);
+        return get(getSchema().getMethod());
     }
 
     /**
@@ -539,7 +569,7 @@ public abstract class HTTPSamplerBase extends AbstractSampler
      * @param charsetName the name of the encoding to be used
      */
     public void setContentEncoding(String charsetName) {
-        setProperty(CONTENT_ENCODING, charsetName);
+        set(getSchema().getContentEncoding(), charsetName);
     }
 
     /**
@@ -547,15 +577,19 @@ public abstract class HTTPSamplerBase extends AbstractSampler
      * @return the encoding of the content, i.e. its charset name
      */
     public String getContentEncoding() {
-        return getPropertyAsString(CONTENT_ENCODING);
+        String encoding = get(getSchema().getContentEncoding());
+        if (encoding.isEmpty()) {
+            return getSchema().getContentEncoding().getDefaultValue();
+        }
+        return encoding;
     }
 
     public void setUseKeepAlive(boolean value) {
-        setProperty(new BooleanProperty(USE_KEEPALIVE, value));
+        set(getSchema().getUseKeepalive(), value);
     }
 
     public boolean getUseKeepAlive() {
-        return getPropertyAsBoolean(USE_KEEPALIVE);
+        return get(getSchema().getUseKeepalive());
     }
 
     /**
@@ -577,19 +611,19 @@ public abstract class HTTPSamplerBase extends AbstractSampler
     }
 
     public void setDoMultipart(boolean value) {
-        setProperty(new BooleanProperty(DO_MULTIPART_POST, value));
+        set(getSchema().getUseMultipartPost(), value);
     }
 
     public boolean getDoMultipart() {
-        return getPropertyAsBoolean(DO_MULTIPART_POST, false);
+        return get(getSchema().getUseMultipartPost());
     }
 
     public void setDoBrowserCompatibleMultipart(boolean value) {
-        setProperty(BROWSER_COMPATIBLE_MULTIPART, value, BROWSER_COMPATIBLE_MULTIPART_MODE_DEFAULT);
+        set(getSchema().getUseBrowserCompatibleMultipart(), value);
     }
 
     public boolean getDoBrowserCompatibleMultipart() {
-        return getPropertyAsBoolean(BROWSER_COMPATIBLE_MULTIPART, BROWSER_COMPATIBLE_MULTIPART_MODE_DEFAULT);
+        return get(getSchema().getUseBrowserCompatibleMultipart());
     }
 
     public void setMonitor(String value) {
@@ -619,19 +653,39 @@ public abstract class HTTPSamplerBase extends AbstractSampler
     }
 
     public void setImplementation(String value) {
-        this.setProperty(IMPLEMENTATION, value);
+        set(getSchema().getImplementation(), value);
     }
 
     public String getImplementation() {
-        return this.getPropertyAsString(IMPLEMENTATION);
+        return get(getSchema().getImplementation());
+    }
+
+    /**
+     * Sets the HTTP version to use, one of {@link HTTPConstants#HTTP_1_1},
+     * {@link HTTPConstants#HTTP_VERSION_2} or {@link HTTPConstants#HTTP_VERSION_2_STRICT}. An empty
+     * value uses the {@code httpclient.version} property instead.
+     *
+     * @param value the HTTP version
+     * @since 6.0
+     */
+    public void setHttpVersion(String value) {
+        set(getSchema().getHttpVersion(), value);
+    }
+
+    /**
+     * @return the HTTP version to use, see {@link #setHttpVersion(String)}
+     * @since 6.0
+     */
+    public String getHttpVersion() {
+        return get(getSchema().getHttpVersion());
     }
 
     public boolean useMD5() {
-        return this.getPropertyAsBoolean(MD5, false);
+        return get(getSchema().getStoreAsMD5());
     }
 
-    public void setMD5(boolean truth) {
-        this.setProperty(MD5, truth, false);
+    public void setMD5(boolean value) {
+        set(getSchema().getStoreAsMD5(), value);
     }
 
     /**
@@ -657,7 +711,7 @@ public abstract class HTTPSamplerBase extends AbstractSampler
                 contentEncoding);
 
         HTTPArgument arg;
-        final boolean nonEmptyEncoding = !StringUtils.isEmpty(contentEncoding);
+        final boolean nonEmptyEncoding = StringUtilities.isNotEmpty(contentEncoding);
         if (nonEmptyEncoding) {
             arg = new HTTPArgument(name, value, metaData, true, contentEncoding);
         } else {
@@ -715,18 +769,18 @@ public abstract class HTTPSamplerBase extends AbstractSampler
 
     @Override
     public void addTestElement(TestElement el) {
-        if (el instanceof CookieManager) {
-            setCookieManager((CookieManager) el);
-        } else if (el instanceof CacheManager) {
-            setCacheManager((CacheManager) el);
-        } else if (el instanceof HeaderManager) {
-            setHeaderManager((HeaderManager) el);
-        } else if (el instanceof AuthManager) {
-            setAuthManager((AuthManager) el);
-        } else if (el instanceof DNSCacheManager) {
-            setDNSResolver((DNSCacheManager) el);
-        } else if (el instanceof KeystoreConfig) {
-            setKeystoreConfigProperty((KeystoreConfig) el);
+        if (el instanceof CookieManager cookieManager) {
+            setCookieManager(cookieManager);
+        } else if (el instanceof CacheManager cacheManager) {
+            setCacheManager(cacheManager);
+        } else if (el instanceof HeaderManager headerManager) {
+            setHeaderManager(headerManager);
+        } else if (el instanceof AuthManager authManager) {
+            setAuthManager(authManager);
+        } else if (el instanceof DNSCacheManager dnsCacheManager) {
+            setDNSResolver(dnsCacheManager);
+        } else if (el instanceof KeystoreConfig keystoreConfig) {
+            setKeystoreConfigProperty(keystoreConfig);
         }  else {
             super.addTestElement(el);
         }
@@ -739,11 +793,11 @@ public abstract class HTTPSamplerBase extends AbstractSampler
      */
     @Override
     public void clearTestElementChildren() {
-        removeProperty(HEADER_MANAGER);
+        removeProperty(getSchema().getHeaderManager());
     }
 
     public void setPort(int value) {
-        setProperty(new IntegerProperty(PORT, value));
+        set(getSchema().getPort(), value);
     }
 
     /**
@@ -770,8 +824,8 @@ public abstract class HTTPSamplerBase extends AbstractSampler
      * @return port number or UNSPECIFIED_PORT (== 0)
      */
     public int getPortIfSpecified() {
-        String portAsString = getPropertyAsString(PORT);
-        if(portAsString == null || portAsString.isEmpty()) {
+        String portAsString = getString(getSchema().getPort());
+        if (StringUtilities.isEmpty(portAsString)) {
             return UNSPECIFIED_PORT;
         }
 
@@ -823,27 +877,27 @@ public abstract class HTTPSamplerBase extends AbstractSampler
     }
 
     public void setDomain(String value) {
-        setProperty(DOMAIN, value);
+        set(getSchema().getDomain(), value);
     }
 
     public String getDomain() {
-        return getPropertyAsString(DOMAIN);
+        return getString(getSchema().getDomain());
     }
 
     public void setConnectTimeout(String value) {
-        setProperty(CONNECT_TIMEOUT, value, "");
+        set(getSchema().getConnectTimeout(), value);
     }
 
     public int getConnectTimeout() {
-        return getPropertyAsInt(CONNECT_TIMEOUT, 0);
+        return get(getSchema().getConnectTimeout());
     }
 
     public void setResponseTimeout(String value) {
-        setProperty(RESPONSE_TIMEOUT, value, "");
+        set(getSchema().getResponseTimeout(), value);
     }
 
     public int getResponseTimeout() {
-        return getPropertyAsInt(RESPONSE_TIMEOUT, 0);
+        return get(getSchema().getResponseTimeout());
     }
 
     public String getProxyScheme() {
@@ -851,62 +905,62 @@ public abstract class HTTPSamplerBase extends AbstractSampler
     }
 
     public void setProxyScheme(String schema) {
-        setProperty(PROXYSCHEME, schema);
+        set(getSchema().getProxy().getScheme(), schema);
     }
 
     public String getProxyHost() {
-        return getPropertyAsString(PROXYHOST);
+        return get(getSchema().getProxy().getHost());
     }
 
     public void setProxyHost(String host) {
-        setProperty(PROXYHOST, host);
+        set(getSchema().getProxy().getHost(), host);
     }
 
     public int getProxyPortInt() {
-        return getPropertyAsInt(PROXYPORT, 0);
+        return get(getSchema().getProxy().getPort());
     }
 
     public void setProxyPortInt(String port) {
-        setProperty(PROXYPORT, port);
+        set(getSchema().getProxy().getPort(), port);
     }
 
     public String getProxyUser() {
-        return getPropertyAsString(PROXYUSER);
+        return get(getSchema().getProxy().getUsername());
     }
 
     public void setProxyUser(String user) {
-        setProperty(PROXYUSER, user);
+        set(getSchema().getProxy().getUsername(), user);
     }
 
     public String getProxyPass() {
-        return getPropertyAsString(PROXYPASS);
+        return get(getSchema().getProxy().getPassword());
     }
 
     public void setProxyPass(String pass) {
-        setProperty(PROXYPASS, pass);
+        set(getSchema().getProxy().getPassword(), pass);
     }
 
     // gets called from ctor, so has to be final
     public final void setArguments(Arguments value) {
-        setProperty(new TestElementProperty(ARGUMENTS, value));
+        set(getSchema().getArguments(), value);
     }
 
     public Arguments getArguments() {
-        return (Arguments) getProperty(ARGUMENTS).getObjectValue();
+        return getOrNull(getSchema().getArguments());
     }
 
     /**
      * @param value Boolean that indicates body will be sent as is
      */
     public void setPostBodyRaw(boolean value) {
-        setProperty(POST_BODY_RAW, value, POST_BODY_RAW_DEFAULT);
+        set(getSchema().getPostBodyRaw(), value);
     }
 
     /**
      * @return boolean that indicates body will be sent as is
      */
     public boolean getPostBodyRaw() {
-        return getPropertyAsBoolean(POST_BODY_RAW, POST_BODY_RAW_DEFAULT);
+        return get(getSchema().getPostBodyRaw());
     }
 
     public void setAuthManager(AuthManager value) {
@@ -916,11 +970,11 @@ public abstract class HTTPSamplerBase extends AbstractSampler
                 log.warn("Existing AuthManager {} superseded by {}", mgr.getName(), value.getName());
             }
         }
-        setProperty(new TestElementProperty(AUTH_MANAGER, value));
+        set(getSchema().getAuthManager(), value);
     }
 
     public AuthManager getAuthManager() {
-        return (AuthManager) getProperty(AUTH_MANAGER).getObjectValue();
+        return getOrNull(getSchema().getAuthManager());
     }
 
     public void setHeaderManager(final HeaderManager value) {
@@ -935,16 +989,16 @@ public abstract class HTTPSamplerBase extends AbstractSampler
                 }
             }
         }
-        setProperty(new TestElementProperty(HEADER_MANAGER, lValue));
+        set(getSchema().getHeaderManager(), lValue);
     }
 
     public HeaderManager getHeaderManager() {
-        return (HeaderManager) getProperty(HEADER_MANAGER).getObjectValue();
+        return getOrNull(getSchema().getHeaderManager());
     }
 
     // private method to allow AsyncSample to reset the value without performing checks
     private void setCookieManagerProperty(CookieManager value) {
-        setProperty(new TestElementProperty(COOKIE_MANAGER, value));
+        set(getSchema().getCookieManager(), value);;
     }
 
     public void setCookieManager(CookieManager value) {
@@ -958,15 +1012,15 @@ public abstract class HTTPSamplerBase extends AbstractSampler
     }
 
     public CookieManager getCookieManager() {
-        return (CookieManager) getProperty(COOKIE_MANAGER).getObjectValue();
+        return getOrNull(getSchema().getCookieManager());
     }
 
     // private method to allow AsyncSample to reset the value without performing checks
     private void setCacheManagerProperty(CacheManager value) {
-        setProperty(new TestElementProperty(CACHE_MANAGER, value));
+        set(getSchema().getCacheManager(), value);
     }
     private void setKeystoreConfigProperty(KeystoreConfig value) {
-        setProperty(new TestElementProperty(KEYSTORE_CONFIG, value));
+        set(getSchema().getKeystoreConfig(), value);
     }
 
     public void setKeystoreConfig(KeystoreConfig value) {
@@ -978,7 +1032,7 @@ public abstract class HTTPSamplerBase extends AbstractSampler
     }
 
     public KeystoreConfig getKeystoreConfig() {
-        return (KeystoreConfig) getProperty(KEYSTORE_CONFIG).getObjectValue();
+        return getOrNull(getSchema().getKeystoreConfig());
     }
 
     public void setCacheManager(CacheManager value) {
@@ -992,11 +1046,11 @@ public abstract class HTTPSamplerBase extends AbstractSampler
     }
 
     public CacheManager getCacheManager() {
-        return (CacheManager) getProperty(CACHE_MANAGER).getObjectValue();
+        return getOrNull(getSchema().getCacheManager());
     }
 
     public DNSCacheManager getDNSResolver() {
-        return (DNSCacheManager) getProperty(DNS_CACHE_MANAGER).getObjectValue();
+        return getOrNull(getSchema().getDnsCacheManager());
     }
 
     public void setDNSResolver(DNSCacheManager cacheManager) {
@@ -1006,15 +1060,15 @@ public abstract class HTTPSamplerBase extends AbstractSampler
                 log.warn("Existing DNSCacheManager {} superseded by {}", mgr.getName(), cacheManager.getName());
             }
         }
-        setProperty(new TestElementProperty(DNS_CACHE_MANAGER, cacheManager));
+        set(getSchema().getDnsCacheManager(), cacheManager);
     }
 
     public boolean isImageParser() {
-        return getPropertyAsBoolean(IMAGE_PARSER, false);
+        return get(getSchema().getRetrieveEmbeddedResources());
     }
 
     public void setImageParser(boolean parseImages) {
-        setProperty(IMAGE_PARSER, parseImages, false);
+        set(getSchema().getRetrieveEmbeddedResources(), parseImages);
     }
 
     /**
@@ -1023,22 +1077,22 @@ public abstract class HTTPSamplerBase extends AbstractSampler
      * @return regular expression (or empty) string
      */
     public String getEmbeddedUrlRE() {
-        return getPropertyAsString(EMBEDDED_URL_RE, "");
+        return get(getSchema().getEmbeddedUrlAllowRegex());
     }
 
     public void setEmbeddedUrlRE(String regex) {
-        setProperty(new StringProperty(EMBEDDED_URL_RE, regex));
+        set(getSchema().getEmbeddedUrlAllowRegex(), regex);
     }
 
     /**
      * @return the regular (as String) expression that embedded URLs must not match
      */
     public String getEmbededUrlExcludeRE() {
-        return getPropertyAsString(EMBEDDED_URL_EXCLUDE_RE, "");
+        return get(getSchema().getEmbeddedUrlExcludeRegex());
     }
 
     public void setEmbeddedUrlExcludeRE(String regex) {
-        setProperty(EMBEDDED_URL_EXCLUDE_RE, regex, "");
+        set(getSchema().getEmbeddedUrlExcludeRegex(), regex);
     }
 
     /**
@@ -1054,9 +1108,8 @@ public abstract class HTTPSamplerBase extends AbstractSampler
     protected HTTPSampleResult errorResult(Throwable e, HTTPSampleResult res) {
         res.setSampleLabel(res.getSampleLabel());
         res.setDataType(SampleResult.TEXT);
-        ByteArrayOutputStream text = new ByteArrayOutputStream(200);
-        e.printStackTrace(new PrintStream(text)); // NOSONAR Stacktrace will be used in the response
-        res.setResponseData(text.toByteArray());
+        res.setResponseData(ExceptionUtils.getStackTraceAsBytes(e, StandardCharsets.UTF_8));
+        res.setDataEncoding(StandardCharsets.UTF_8.name());
         res.setResponseCode(NON_HTTP_RESPONSE_CODE+": " + e.getClass().getName());
         res.setResponseMessage(NON_HTTP_RESPONSE_MESSAGE+": " + e.getMessage());
         res.setSuccessful(false);
@@ -1104,7 +1157,7 @@ public abstract class HTTPSamplerBase extends AbstractSampler
             // If no encoding is specified by user, we will get it
             // encoded in UTF-8, which is what the HTTP spec says
             String queryString = getQueryString(getContentEncoding());
-            if (queryString.length() > 0) {
+            if (!queryString.isEmpty()) {
                 if (path.contains(QRY_PFX)) {// Already contains a prefix
                     pathAndQuery.append(QRY_SEP);
                 } else {
@@ -1140,20 +1193,20 @@ public abstract class HTTPSamplerBase extends AbstractSampler
      */
     public String getQueryString(final String contentEncoding) {
 
-        CollectionProperty arguments = getArguments().getArguments();
+        Arguments args = getArguments();
+        Iterator<JMeterProperty> iter = args.getEnabledArguments().iterator();
         // Optimisation : avoid building useless objects if empty arguments
-        if(arguments.isEmpty()) {
+        if (!iter.hasNext()) {
             return "";
         }
         String lContentEncoding = contentEncoding;
         // Check if the sampler has a specified content encoding
-        if (JOrphanUtils.isBlank(lContentEncoding)) {
+        if (StringUtilities.isBlank(lContentEncoding)) {
             // We use the encoding which should be used according to the HTTP spec, which is UTF-8
             lContentEncoding = EncoderCache.URL_ARGUMENT_ENCODING;
         }
 
-        StringBuilder buf = new StringBuilder(arguments.size() * 15);
-        PropertyIterator iter = arguments.iterator();
+        StringBuilder buf = new StringBuilder(args.getArgumentCount() * 15);
         boolean first = true;
         while (iter.hasNext()) {
             HTTPArgument item = null;
@@ -1236,11 +1289,11 @@ public abstract class HTTPSamplerBase extends AbstractSampler
                 name = arg;
                 value = "";
             }
-            if (name.length() > 0) {
+            if (!name.isEmpty()) {
                 log.debug("Name: {} Value: {} Metadata: {}", name, value, metaData);
                 // If we know the encoding, we can decode the argument value,
                 // to make it easier to read for the user
-                if (!StringUtils.isEmpty(contentEncoding)) {
+                if (StringUtilities.isNotEmpty(contentEncoding)) {
                     addEncodedArgument(name, value, metaData, contentEncoding);
                 } else {
                     // If we do not know the encoding, we just use the encoded value
@@ -1365,28 +1418,9 @@ public abstract class HTTPSamplerBase extends AbstractSampler
 
             // Get the URL matcher
             String allowRegex = getEmbeddedUrlRE();
-            Perl5Matcher localMatcher = null;
-            Pattern allowPattern = null;
-            if (allowRegex.length() > 0) {
-                try {
-                    allowPattern = JMeterUtils.getPattern(allowRegex);
-                    localMatcher = JMeterUtils.getMatcher();// don't fetch unless pattern compiles
-                } catch (MalformedCachePatternException e) { // NOSONAR
-                    log.warn("Ignoring embedded URL match string: {}", e.getMessage());
-                }
-            }
-            Pattern excludePattern = null;
+            Predicate<URL> allowPredicate = generateMatcherPredicate(allowRegex, "allow", true);
             String excludeRegex = getEmbededUrlExcludeRE();
-            if (excludeRegex.length() > 0) {
-                try {
-                    excludePattern = JMeterUtils.getPattern(excludeRegex);
-                    if (localMatcher == null) {
-                        localMatcher = JMeterUtils.getMatcher();// don't fetch unless pattern compiles
-                    }
-                } catch (MalformedCachePatternException e) { // NOSONAR
-                    log.warn("Ignoring embedded URL exclude string: {}", e.getMessage());
-                }
-            }
+            Predicate<URL> excludePredicate = generateMatcherPredicate(excludeRegex, "exclude", false);
 
             // For concurrent get resources
             final List<Callable<AsynSamplerResultHolder>> list = new ArrayList<>();
@@ -1423,12 +1457,11 @@ public abstract class HTTPSamplerBase extends AbstractSampler
                             setParentSampleSuccess(res, false);
                             continue;
                         }
-                        log.debug("allowPattern: {}, excludePattern: {}, localMatcher: {}, url: {}", allowPattern, excludePattern, localMatcher, url);
-                        // I don't think localMatcher can be null here, but check just in case
-                        if (allowPattern != null && localMatcher != null && !localMatcher.matches(url.toString(), allowPattern)) {
+                        log.debug("allowPattern: {}, excludePattern: {}, url: {}", allowRegex, excludeRegex, url);
+                        if (!allowPredicate.test(url)) {
                             continue; // we have a pattern and the URL does not match, so skip it
                         }
-                        if (excludePattern != null && localMatcher != null && localMatcher.matches(url.toString(), excludePattern)) {
+                        if (excludePredicate.test(url)) {
                             continue; // we have a pattern and the URL does not match, so skip it
                         }
                         try {
@@ -1491,6 +1524,29 @@ public abstract class HTTPSamplerBase extends AbstractSampler
         return res;
     }
 
+    private static Predicate<URL> generateMatcherPredicate(String regex, String explanation, boolean defaultAnswer) {
+        if (StringUtilities.isEmpty(regex)) {
+            return s -> defaultAnswer;
+        }
+        if (USE_JAVA_REGEX) {
+            try {
+                java.util.regex.Pattern pattern = JMeterUtils.compilePattern(regex);
+                return s -> pattern.matcher(s.toString()).matches();
+            } catch (PatternSyntaxException e) {
+                log.warn("Ignoring embedded URL {} string: {}", explanation, e.getMessage());
+                return s -> defaultAnswer;
+            }
+        }
+        try {
+            Pattern pattern = JMeterUtils.getPattern(regex);
+            Perl5Matcher matcher = JMeterUtils.getMatcher();
+            return s -> matcher.matches(s.toString(), pattern);
+        } catch (MalformedCachePatternException e) { // NOSONAR
+            log.warn("Ignoring embedded URL {} string: {}", explanation, e.getMessage());
+            return s -> defaultAnswer;
+        }
+    }
+
     static void registerParser(String contentType, String className) {
         log.info("Parser for {} is {}", contentType, className);
         PARSERS_FOR_CONTENT_TYPE.put(contentType, className);
@@ -1503,11 +1559,11 @@ public abstract class HTTPSamplerBase extends AbstractSampler
      * @return {@link LinkExtractorParser}
      * @throws LinkExtractorParseException
      */
-    private LinkExtractorParser getParser(HTTPSampleResult res)
+    private static LinkExtractorParser getParser(HTTPSampleResult res)
             throws LinkExtractorParseException {
         String parserClassName =
                 PARSERS_FOR_CONTENT_TYPE.get(res.getMediaType());
-        if (!StringUtils.isEmpty(parserClassName)) {
+        if (StringUtilities.isNotEmpty(parserClassName)) {
             return BaseParser.getParser(parserClassName);
         }
         return null;
@@ -1517,7 +1573,7 @@ public abstract class HTTPSamplerBase extends AbstractSampler
      * @param url URL to escape
      * @return escaped url
      */
-    private URL escapeIllegalURLCharacters(java.net.URL url) {
+    private static URL escapeIllegalURLCharacters(java.net.URL url) {
         if (url == null || "file".equals(url.getProtocol())) {
             return url;
         }
@@ -1534,7 +1590,7 @@ public abstract class HTTPSamplerBase extends AbstractSampler
      * @param sampleResult HTTPSampleResult
      * @return User Agent part
      */
-    private String getUserAgent(HTTPSampleResult sampleResult) {
+    private static String getUserAgent(HTTPSampleResult sampleResult) {
         String res = sampleResult.getRequestHeaders();
         int index = res.indexOf(USER_AGENT);
         if (index >= 0) {
@@ -1561,7 +1617,7 @@ public abstract class HTTPSamplerBase extends AbstractSampler
      * @param res {@link HTTPSampleResult}
      * @param initialValue boolean
      */
-    private void setParentSampleSuccess(HTTPSampleResult res, boolean initialValue) {
+    private static void setParentSampleSuccess(HTTPSampleResult res, boolean initialValue) {
         if (!IGNORE_FAILED_EMBEDDED_RESOURCES) {
             res.setSuccessful(initialValue);
             if (!initialValue) {
@@ -1653,9 +1709,9 @@ public abstract class HTTPSamplerBase extends AbstractSampler
             // this behaviour.
             location = encodeSpaces(location);
             log.debug("Location after /. and space transforms: {}", location);
-            // Change all but HEAD into GET (Bug 55450)
+            // Compute method based on redirect status code (Bug 55450, RFC 9110)
             String method = lastRes.getHTTPMethod();
-            method = computeMethodForRedirect(method);
+            method = computeMethodForRedirect(method, lastRes.getResponseCode());
 
             try {
                 URL url = ConversionUtils.makeRelativeURL(lastRes.getURL(), location);
@@ -1719,13 +1775,25 @@ public abstract class HTTPSamplerBase extends AbstractSampler
     }
 
     /**
-     * See <a href="http://tools.ietf.org/html/rfc2616#section-10.3">RFC2616#section-10.3</a>
-     * JMeter conforms currently to HttpClient 4.5.2 supported RFC
-     * TODO Update when migrating to HttpClient 5.X using response code
+     * Compute the HTTP method to use for a redirect response.
+     *
+     * <ul>
+     *   <li>307/308: preserve method</li>
+     *   <li>301/302/303: HEAD stays HEAD, others become GET</li>
+     * </ul>
+     *
      * @param initialMethod the initial HTTP Method
-     * @return the new HTTP Method as per RFC
+     * @param responseCode the current redirect response code
+     * @return the HTTP Method to use for the redirected request
      */
-    private String computeMethodForRedirect(String initialMethod) {
+    private static String computeMethodForRedirect(String initialMethod, String responseCode) {
+        // 307: RFC 9110 §15.4.8, 308: RFC 7538 §3 / RFC 9110 Errata 7109
+        // 307/308: preserve original method
+        if (HTTPConstants.SC_TEMPORARY_REDIRECT.equals(responseCode)
+                || HTTPConstants.SC_PERMANENT_REDIRECT.equals(responseCode)) {
+            return initialMethod;
+        }
+        // 301/302/303: HEAD stays HEAD, others become GET (Bug 55450)
         if (!HTTPConstants.HEAD.equalsIgnoreCase(initialMethod)) {
             return HTTPConstants.GET;
         }
@@ -1807,25 +1875,21 @@ public abstract class HTTPSamplerBase extends AbstractSampler
         return newValue.toString();
     }
 
-    /*
+    /**
      * Method to set files list to be uploaded.
      *
      * @param value
      *   HTTPFileArgs object that stores file list to be uploaded.
      */
     private void setHTTPFileArgs(HTTPFileArgs value) {
-        if (value.getHTTPFileArgCount() > 0) {
-            setProperty(new TestElementProperty(FILE_ARGS, value));
-        } else {
-            removeProperty(FILE_ARGS); // no point saving an empty list
-        }
+        set(getSchema().getFileArguments(), value.getHTTPFileArgCount() == 0 ? null : value);
     }
 
-    /*
+    /**
      * Method to get files list to be uploaded.
      */
-    private HTTPFileArgs getHTTPFileArgs() {
-        return (HTTPFileArgs) getProperty(FILE_ARGS).getObjectValue();
+    private @Nullable HTTPFileArgs getHTTPFileArgs() {
+        return getOrNull(getSchema().getFileArguments());
     }
 
     /**
@@ -1907,7 +1971,7 @@ public abstract class HTTPSamplerBase extends AbstractSampler
      */
     public byte[] readResponse(SampleResult sampleResult, InputStream in, long length) throws IOException {
 
-        OutputStream w = null;
+        DirectAccessByteArrayOutputStream w = null;
         try (Closeable ignore = in) { // NOSONAR No try with resource as performance is critical here
             byte[] readBuffer = new byte[8192]; // 8kB is the (max) size to have the latency ('the first packet')
             int bufferSize = 32;// Enough for MD5
@@ -1937,13 +2001,8 @@ public abstract class HTTPSamplerBase extends AbstractSampler
                 if (first) {
                     sampleResult.latencyEnd();
                     first = false;
-                    if(md == null) {
-                        if(!knownResponseLength) {
-                            w = new org.apache.commons.io.output.ByteArrayOutputStream(bufferSize);
-                        }
-                        else {
-                            w = new DirectAccessByteArrayOutputStream(bufferSize);
-                        }
+                    if (md == null) {
+                        w = new DirectAccessByteArrayOutputStream(knownResponseLength ? bufferSize : 8192);
                     }
                 }
 
@@ -1971,7 +2030,7 @@ public abstract class HTTPSamplerBase extends AbstractSampler
             }
 
             if (md == null) {
-                return toByteArray(w);
+                return w.toByteArray();
             } else {
                 byte[] md5Result = md.digest();
                 sampleResult.setBytes(totalBytes);
@@ -1979,27 +2038,8 @@ public abstract class HTTPSamplerBase extends AbstractSampler
             }
 
         } finally {
-            IOUtils.closeQuietly(w, null);
+            JOrphanUtils.closeQuietly(w);
         }
-    }
-
-    /**
-     * Optimized method to get byte array from {@link OutputStream}
-     * @param w {@link OutputStream}
-     * @return byte array
-     */
-    private byte[] toByteArray(OutputStream w) {
-        if(w instanceof DirectAccessByteArrayOutputStream) {
-            return ((DirectAccessByteArrayOutputStream) w).toByteArray();
-        }
-
-        if(w instanceof org.apache.commons.io.output.ByteArrayOutputStream) {
-            return ((org.apache.commons.io.output.ByteArrayOutputStream) w).toByteArray();
-        }
-
-        log.warn("Unknown stream type {}", w.getClass());
-
-        return null;
     }
 
     /**
@@ -2059,7 +2099,7 @@ public abstract class HTTPSamplerBase extends AbstractSampler
      * @param value IP source to use
      */
     public void setIpSource(String value) {
-        setProperty(IP_SOURCE, value, "");
+        set(getSchema().getIpSource(), value);
     }
 
     /**
@@ -2068,7 +2108,7 @@ public abstract class HTTPSamplerBase extends AbstractSampler
      * @return IP source to use
      */
     public String getIpSource() {
-        return getPropertyAsString(IP_SOURCE, "");
+        return get(getSchema().getIpSource());
     }
 
     /**
@@ -2077,7 +2117,7 @@ public abstract class HTTPSamplerBase extends AbstractSampler
      * @param value type of the IP/address source
      */
     public void setIpSourceType(int value) {
-        setProperty(IP_SOURCE_TYPE, value, SOURCE_TYPE_DEFAULT);
+        set(getSchema().getIpSourceType(), value);
     }
 
     /**
@@ -2086,7 +2126,7 @@ public abstract class HTTPSamplerBase extends AbstractSampler
      * @return address source type
      */
     public int getIpSourceType() {
-        return getPropertyAsInt(IP_SOURCE_TYPE, SOURCE_TYPE_DEFAULT);
+        return get(getSchema().getIpSourceType());
     }
 
     /**
@@ -2095,11 +2135,11 @@ public abstract class HTTPSamplerBase extends AbstractSampler
      * @return true if used
      */
     public boolean isConcurrentDwn() {
-        return getPropertyAsBoolean(CONCURRENT_DWN, false);
+        return get(getSchema().getConcurrentDownload());
     }
 
     public void setConcurrentDwn(boolean concurrentDwn) {
-        setProperty(CONCURRENT_DWN, concurrentDwn, false);
+        set(getSchema().getConcurrentDownload(), concurrentDwn);
     }
 
     /**
@@ -2108,11 +2148,11 @@ public abstract class HTTPSamplerBase extends AbstractSampler
      * @return the pool size
      */
     public String getConcurrentPool() {
-        return getPropertyAsString(CONCURRENT_POOL, CONCURRENT_POOL_DEFAULT);
+        return getString(getSchema().getConcurrentDownloadPoolSize());
     }
 
     public void setConcurrentPool(String poolSize) {
-        setProperty(CONCURRENT_POOL, poolSize, CONCURRENT_POOL_DEFAULT);
+        set(getSchema().getConcurrentDownloadPoolSize(), poolSize);
     }
 
 
@@ -2184,8 +2224,8 @@ public abstract class HTTPSamplerBase extends AbstractSampler
 
         totalReplaced += JOrphanUtils.replaceValue(regex, replaceBy, caseSensitive, getPath(), this::setPath);
         totalReplaced += JOrphanUtils.replaceValue(regex, replaceBy, caseSensitive, getDomain(), this::setDomain);
-        for (String key: Arrays.asList(PORT, PROTOCOL)) {
-            totalReplaced += JOrphanUtils.replaceValue(regex, replaceBy, caseSensitive, getPropertyAsString(key), s -> setProperty(key, s));
+        for (PropertyDescriptor<HTTPSamplerBaseSchema, ? extends Serializable> key : Arrays.asList(getSchema().getPort(), getSchema().getProtocol())) {
+            totalReplaced += JOrphanUtils.replaceValue(regex, replaceBy, caseSensitive, getString(key), s -> set(key, s));
         }
 
         return totalReplaced;

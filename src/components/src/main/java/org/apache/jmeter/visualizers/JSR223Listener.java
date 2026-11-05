@@ -53,7 +53,7 @@ public class JSR223Listener extends JSR223TestElement
             bindings.put("sampleResult", event.getResult());
             processFileOrScript(scriptEngine, bindings);
         } catch (ScriptException | IOException e) {
-            log.error("Problem in JSR223 script, {}", getName(), e);
+            log.error("Problem in JSR223 element named: '{}'", getName(), e);
         }
     }
 
@@ -78,6 +78,7 @@ public class JSR223Listener extends JSR223TestElement
     }
 
     @Override
+    @SuppressWarnings("RedundantOverride")
     public Object clone() {
         return super.clone();
     }

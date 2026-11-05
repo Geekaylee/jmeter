@@ -22,7 +22,7 @@
 
 <module name="Checker">
 
-  <property name="cacheFile" value="${cache_file}"/>
+  <property name="cacheFile" value="${config_loc}/${cache_file}"/>
 
   <property name="localeLanguage" value="en"/>
   <property name="charset" value="UTF-8"/>
@@ -73,6 +73,13 @@
     <property name="max" value="160"/>
     <property name="fileExtensions" value="java, kt, kts, groovy"/>
   </module>
+  <!-- See https://checkstyle.sourceforge.io/checks/sizes/linelength.html#Example6-config -->
+  <!-- See https://github.com/checkstyle/checkstyle/issues/17707 -->
+  <module name="SuppressWithPlainTextCommentFilter">
+    <property name="checkFormat" value="LineLength"/>
+    <property name="offCommentFormat" value='^.*"""$'/>
+    <property name="onCommentFormat" value='^\s*"""\s*(?:[,;]|.+)$'/>
+  </module>
 
   <module name="TreeWalker">
 
@@ -109,10 +116,9 @@
       <property name="classes" value="java.lang.Boolean"/>
     </module>
     <module name="IllegalThrows"/>
-    <module name="MissingSwitchDefault"/>
     <module name="ModifiedControlVariable"/>
     <module name="MultipleVariableDeclarations"/>
-    <module name="NestedForDepth"/>
+
     <module name="NestedIfDepth">
       <!-- TODO: reduce this number -->
       <property name="max" value="4"/>

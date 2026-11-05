@@ -20,7 +20,7 @@ package org.apache.jmeter.extractor;
 import java.util.List;
 
 import org.apache.jmeter.threads.JMeterContextService;
-import org.apache.jorphan.util.JOrphanUtils;
+import org.apache.jorphan.util.StringUtilities;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -78,8 +78,8 @@ public class JSoupExtractor implements Extractor {
      * @param element Element
      * @return String value
      */
-    private String extractValue(String attribute, Element element) {
-        if (!JOrphanUtils.isBlank(attribute)) {
+    private static String extractValue(String attribute, Element element) {
+        if (StringUtilities.isNotBlank(attribute)) {
             return element.attr(attribute);
         } else {
             return element.text().trim();

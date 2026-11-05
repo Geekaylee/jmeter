@@ -28,8 +28,8 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.util.JMeterUtils;
+import org.apache.jorphan.util.StringUtilities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
@@ -91,7 +91,7 @@ public class TemplateManager {
 
         final String[] templateFiles = TEMPLATE_FILES.split(",");
         for (String templateFile : templateFiles) {
-            if(!StringUtils.isEmpty(templateFile)) {
+            if (StringUtilities.isNotEmpty(templateFile)) {
                 final File file = new File(JMeterUtils.getJMeterHome(), templateFile);
                 try {
                     if(file.exists() && file.canRead()) {
@@ -124,8 +124,8 @@ public class TemplateManager {
     }
 
     public static final class LoggingErrorHandler implements ErrorHandler {
-        private Logger logger;
-        private File file;
+        private final Logger logger;
+        private final File file;
 
         public LoggingErrorHandler(Logger logger, File file) {
             this.logger = logger;
@@ -188,7 +188,7 @@ public class TemplateManager {
      * @param templates Map of {@link Template} referenced by name
      * @param templateNode {@link Node} the xml template node
      */
-    void parseTemplateNode(Map<String, Template> templates, Node templateNode) {
+    static void parseTemplateNode(Map<? super String, ? super Template> templates, Node templateNode) {
         if (templateNode.getNodeType() == Node.ELEMENT_NODE) {
             Template template = new Template();
             Element element =  (Element) templateNode;
@@ -206,11 +206,11 @@ public class TemplateManager {
         }
     }
 
-    private String textOfFirstTag(Element element, String tagName) {
+    private static String textOfFirstTag(Element element, String tagName) {
         return element.getElementsByTagName(tagName).item(0).getTextContent();
     }
 
-    private Map<String, String> parseParameterNodes(NodeList parameterNodes) {
+    private static Map<String, String> parseParameterNodes(NodeList parameterNodes) {
         Map<String, String> parametersMap = new HashMap<>();
         for (int i = 0; i < parameterNodes.getLength(); i++) {
             Element element =  (Element) parameterNodes.item(i);

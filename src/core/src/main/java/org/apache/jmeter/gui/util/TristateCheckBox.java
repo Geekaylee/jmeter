@@ -181,10 +181,10 @@ public final class TristateCheckBox extends JCheckBox {
         // Fire ActionEvent
         int modifiers = 0;
         AWTEvent currentEvent = EventQueue.getCurrentEvent();
-        if (currentEvent instanceof InputEvent) {
-            modifiers = ((InputEvent) currentEvent).getModifiers();
-        } else if (currentEvent instanceof ActionEvent) {
-            modifiers = ((ActionEvent) currentEvent).getModifiers();
+        if (currentEvent instanceof InputEvent inputEvent) {
+            modifiers = inputEvent.getModifiers();
+        } else if (currentEvent instanceof ActionEvent actionEvent) {
+            modifiers = actionEvent.getModifiers();
         }
         fireActionPerformed(new ActionEvent(this,
                 ActionEvent.ACTION_PERFORMED, getText(),
@@ -192,7 +192,7 @@ public final class TristateCheckBox extends JCheckBox {
     }
 
     //Convenience cast
-    public TristateButtonModel getTristateModel() {
+    private TristateButtonModel getTristateModel() {
         return (TristateButtonModel) super.getModel();
     }
 
@@ -204,19 +204,19 @@ public final class TristateCheckBox extends JCheckBox {
         private final Icon icon;
         private final boolean original;
 
-        public TristateButtonModel(TristateState initial,
+        private TristateButtonModel(TristateState initial,
                 TristateCheckBox tristateCheckBox, boolean original) {
-            setState(TristateState.DESELECTED);
+            setState(initial);
             this.tristateCheckBox = tristateCheckBox;
             icon = new TristateCheckBoxIcon();
             this.original = original;
         }
 
-        public void setIndeterminate() {
+        private void setIndeterminate() {
             setState(TristateState.INDETERMINATE);
         }
 
-        public boolean isIndeterminate() {
+        private boolean isIndeterminate() {
             return state == TristateState.INDETERMINATE;
         }
 
@@ -286,7 +286,7 @@ public final class TristateCheckBox extends JCheckBox {
 
         }
 
-        public TristateState getState() {
+        private TristateState getState() {
             return state;
         }
     }
@@ -301,7 +301,7 @@ public final class TristateCheckBox extends JCheckBox {
         private final int iconHeight;
         private final int iconWidth;
 
-        public TristateCheckBoxIcon() {
+        private TristateCheckBoxIcon() {
             // Assume that the UI has not changed since the checkbox was created
             UIDefaults defaults = UIManager.getLookAndFeelDefaults();
             Icon icon = defaults.getIcon("CheckBox.icon");
@@ -343,7 +343,7 @@ public final class TristateCheckBox extends JCheckBox {
             g.drawLine(left, height - 1, right, height - 1);
         }
 
-        private void drawFlush3DBorder(Graphics g, int x, int y, int w, int h) {
+        private static void drawFlush3DBorder(Graphics g, int x, int y, int w, int h) {
             g.translate(x, y);
             g.setColor(MetalLookAndFeel.getControlDarkShadow());
             g.drawRect(0, 0, w - 2, h - 2);
@@ -355,7 +355,7 @@ public final class TristateCheckBox extends JCheckBox {
             g.translate(-x, -y);
         }
 
-        private void drawPressed3DBorder(Graphics g, int x, int y, int w, int h) {
+        private static void drawPressed3DBorder(Graphics g, int x, int y, int w, int h) {
             g.translate(x, y);
             drawFlush3DBorder(g, 0, 0, w, h);
             g.setColor(MetalLookAndFeel.getControlShadow());

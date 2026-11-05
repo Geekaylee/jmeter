@@ -36,21 +36,24 @@ import javax.swing.JSplitPane;
 import javax.swing.JTabbedPane;
 import javax.swing.JTextField;
 
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.jmeter.extractor.XPath2Extractor;
 import org.apache.jmeter.gui.util.JSyntaxTextArea;
 import org.apache.jmeter.gui.util.JTextScrollPane;
 import org.apache.jmeter.samplers.SampleResult;
 import org.apache.jmeter.util.JMeterUtils;
 import org.apache.jmeter.util.XPathUtil;
+import org.apache.jorphan.util.ExceptionUtils;
+import org.apache.jorphan.util.StringUtilities;
 import org.fife.ui.rsyntaxtextarea.SyntaxConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.auto.service.AutoService;
+
 /**
  * Implement ResultsRender for XPath tester
  */
+@AutoService(ResultRenderer.class)
 public class RenderAsXPath2 implements ResultRenderer, ActionListener {
 
     private static final Logger log = LoggerFactory.getLogger(RenderAsXPath2.class);
@@ -100,7 +103,7 @@ public class RenderAsXPath2 implements ResultRenderer, ActionListener {
     public void actionPerformed(ActionEvent e) {
         String command = e.getActionCommand();
         String xmlDataFieldText = xmlDataField.getText();
-        if (StringUtils.isEmpty(xmlDataFieldText)) {
+        if (StringUtilities.isEmpty(xmlDataFieldText)) {
             return;
         }
         if (XPATH_TESTER_COMMAND.equals(command)) {
@@ -118,8 +121,8 @@ public class RenderAsXPath2 implements ResultRenderer, ActionListener {
      * @param textToParse
      */
     private void executeAndShowXPathTester(String textToParse, XPath2Extractor extractor) {
-        if (textToParse != null && textToParse.length() > 0
-                && this.xpathExpressionField.getText().length() > 0) {
+        if (StringUtilities.isNotEmpty(textToParse)
+                && !this.xpathExpressionField.getText().isEmpty()) {
             this.xpathResultField.setText(process(textToParse, extractor));
             this.xpathResultField.setCaretPosition(0); // go to first line
         }
@@ -143,7 +146,7 @@ public class RenderAsXPath2 implements ResultRenderer, ActionListener {
     }
 
 
-    private String getDocumentNamespaces(String textToParse) {
+    private static String getDocumentNamespaces(String textToParse) {
         StringBuilder result = new StringBuilder();
         try {
             List<String[]> namespaces = XPathUtil.getNamespaces(textToParse);
@@ -164,6 +167,7 @@ public class RenderAsXPath2 implements ResultRenderer, ActionListener {
     @Override
     public void renderResult(SampleResult sampleResult) {
         String response = ViewResultsFullVisualizer.getResponseAsString(sampleResult);
+        response = ViewResultsFullVisualizer.wrapLongLines(response);
         try {
             xmlDataField.setText(response == null ? "" : response);
             xmlDataField.setCaretPosition(0);
@@ -279,7 +283,7 @@ public class RenderAsXPath2 implements ResultRenderer, ActionListener {
         return panel;
     }
 
-    private void initConstraints(GridBagConstraints gbc) {
+    private static void initConstraints(GridBagConstraints gbc) {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.gridheight = 1;
         gbc.gridwidth = 1;

@@ -17,27 +17,23 @@
 
 package org.apache.jmeter.protocol.jms.sampler.render;
 
-import static org.hamcrest.CoreMatchers.allOf;
-import static org.hamcrest.CoreMatchers.containsString;
-import static org.hamcrest.CoreMatchers.instanceOf;
-import static org.junit.internal.matchers.ThrowableCauseMatcher.hasCause;
-import static org.junit.internal.matchers.ThrowableMessageMatcher.hasMessage;
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 
 import org.apache.jmeter.threads.JMeterVariables;
-import org.hamcrest.MatcherAssert;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 public class BinaryMessageRendererTest extends MessageRendererTest<byte[]> {
-
     private BinaryMessageRenderer render = RendererFactory.getInstance().getBinary();
 
     @Override
@@ -69,11 +65,14 @@ public class BinaryMessageRendererTest extends MessageRendererTest<byte[]> {
                 RuntimeException.class,
                 () -> render.getContent("__file_that_may_not_exists_else_it_will_fail")
         );
-
-        MatcherAssert.assertThat(ex, allOf(
-                hasMessage(containsString("Can't read content of __file_that_may_not_exists_else_it_will_fail")),
-                hasCause(instanceOf(IOException.class))
-        ));
+        assertAll(
+                () -> assertInstanceOf(IOException.class, ex.getCause(), "ex.getCause()"),
+                () -> assertContains(
+                        ex.getMessage(),
+                        "Can't read content of __file_that_may_not_exists_else_it_will_fail",
+                        "ex.getCause().getMessage()"
+                )
+        );
     }
 
     @Test
@@ -99,11 +98,12 @@ public class BinaryMessageRendererTest extends MessageRendererTest<byte[]> {
                 RuntimeException.class,
                 () -> render.getValueFromFile("utf8.txt", "banana", true, cache)
         );
-        MatcherAssert.assertThat(
-                ex,
-                allOf(
-                        hasMessage(containsString("utf8.txt")),
-                        hasCause(instanceOf(UnsupportedEncodingException.class))
+        assertAll(
+                () -> assertInstanceOf(UnsupportedEncodingException.class, ex.getCause(), "ex.getCause()"),
+                () -> assertContains(
+                        ex.getMessage(),
+                        "utf8.txt",
+                        "ex.getCause().getMessage()"
                 )
         );
     }
@@ -114,6 +114,10 @@ public class BinaryMessageRendererTest extends MessageRendererTest<byte[]> {
         String fileName = writeFile("oneVar.txt", text);
         assertValueFromFile(text, fileName, false);
         assertCacheContentInBytes(text);
+    }
+
+    private static void assertContains(String value, String substring, String message) {
+        assertTrue(value.contains(substring), () -> message + ": " + value + " should contain " + substring);
     }
 
     protected void assertValueFromFile(String expected, String fileName, boolean hasVariable) {

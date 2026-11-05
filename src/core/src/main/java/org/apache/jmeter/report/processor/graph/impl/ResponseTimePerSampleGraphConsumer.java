@@ -53,12 +53,6 @@ public class ResponseTimePerSampleGraphConsumer extends AbstractGraphConsumer {
         setRevertKeysAndValues(true);
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see org.apache.jmeter.report.csv.processor.impl.AbstractGraphConsumer#
-     * createKeysSelector()
-     */
     @Override
     protected final GraphKeysSelector createKeysSelector() {
         return new IndexedNameSelector();
@@ -72,7 +66,7 @@ public class ResponseTimePerSampleGraphConsumer extends AbstractGraphConsumer {
      * @param defaultValue the default value
      * @return the group info
      */
-    private GroupInfo createGroupInfo(String propertyKey, int defaultValue) {
+    private static GroupInfo createGroupInfo(String propertyKey, int defaultValue) {
         int property = JMeterUtils.getPropDefault(propertyKey, defaultValue);
         PercentileAggregatorFactory factory = new PercentileAggregatorFactory();
         factory.setPercentileIndex(property);
@@ -85,12 +79,6 @@ public class ResponseTimePerSampleGraphConsumer extends AbstractGraphConsumer {
                 new ElapsedTimeValueSelector(false), false, false);
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see org.apache.jmeter.report.csv.processor.impl.AbstractGraphConsumer#
-     * createGroupInfos()
-     */
     @Override
     protected Map<String, GroupInfo> createGroupInfos() {
         HashMap<String, GroupInfo> groupInfos = new HashMap<>(6);
@@ -107,12 +95,6 @@ public class ResponseTimePerSampleGraphConsumer extends AbstractGraphConsumer {
         return groupInfos;
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see org.apache.jmeter.report.processor.graph.AbstractGraphConsumer#
-     * initializeExtraResults(org.apache.jmeter.report.processor.MapResultData)
-     */
     @Override
     protected void initializeExtraResults(MapResultData parentResult) {
         ListResultData samples = new ListResultData();

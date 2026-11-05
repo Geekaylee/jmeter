@@ -23,9 +23,10 @@ import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,7 +50,6 @@ import javax.swing.border.Border;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.ChangeListener;
 
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.jmeter.gui.TestElementMetadata;
 import org.apache.jmeter.gui.action.ActionNames;
 import org.apache.jmeter.gui.action.ActionRouter;
@@ -67,6 +67,7 @@ import org.apache.jorphan.gui.JFactory;
 import org.apache.jorphan.gui.JLabeledTextField;
 import org.apache.jorphan.gui.JMeterUIDefaults;
 import org.apache.jorphan.math.StatCalculatorLong;
+import org.apache.jorphan.util.StringUtilities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -277,8 +278,8 @@ public class RespTimeGraphVisualizer extends AbstractVisualizer implements Actio
         init();
     }
 
-    private String[] keys(Map<String, ?> map) {
-        return map.keySet().toArray(ArrayUtils.EMPTY_STRING_ARRAY);
+    private static String[] keys(Map<String, ?> map) {
+        return map.keySet().toArray(new String[0]);
     }
 
     @Override
@@ -347,16 +348,16 @@ public class RespTimeGraphVisualizer extends AbstractVisualizer implements Actio
         if (!dynamicGraphSize.isSelected()) {
             String wstr = graphWidth.getText();
             String hstr = graphHeight.getText();
-            if (wstr.length() != 0) {
+            if (!wstr.isEmpty()) {
                 width = Integer.parseInt(wstr);
             }
-            if (hstr.length() != 0) {
+            if (!hstr.isEmpty()) {
                 height = Integer.parseInt(hstr);
             }
         }
 
         String yAxisStr = maxValueYAxisLabel.getText();
-        int maxYAxisScale = yAxisStr.length() == 0 ? 0 : Integer.parseInt(yAxisStr);
+        int maxYAxisScale = yAxisStr.isEmpty() ? 0 : Integer.parseInt(yAxisStr);
 
         graphPanel.setData(this.getData());
         graphPanel.setTitle(graphTitle.getText());
@@ -537,12 +538,12 @@ public class RespTimeGraphVisualizer extends AbstractVisualizer implements Actio
                 intervalValue = Integer.parseInt(intervalField.getText());
             }
             if (eventSource == applyFilterBtn && samplerSelection.isSelected() && samplerMatchLabel.getText() != null
-                    && samplerMatchLabel.getText().length() > 0) {
+                    && !samplerMatchLabel.getText().isEmpty()) {
                 pattern = createPattern(samplerMatchLabel.getText());
             } else if (forceReloadData) {
                 pattern = null;
             }
-            if (getFile() != null && getFile().length() > 0) {
+            if (StringUtilities.isNotEmpty(getFile())) {
                 // Reload data from file
                 clearData();
                 FilePanel filePanel = (FilePanel) getFilePanel();
@@ -705,12 +706,13 @@ public class RespTimeGraphVisualizer extends AbstractVisualizer implements Actio
         return buttonPanel;
     }
 
-    @SuppressWarnings("JdkObsolete")
     public String[] getXAxisLabels() {
-        SimpleDateFormat formatter = new SimpleDateFormat(xAxisTimeFormat.getText()); //$NON-NLS-1$
+        DateTimeFormatter formatter = DateTimeFormatter
+                .ofPattern(xAxisTimeFormat.getText()) //$NON-NLS-1$
+                .withZone(ZoneId.systemDefault());
         String[] xAxisLabels = new String[(int) durationTest]; // Test can't have a duration more than 2^31 secs (cast from long to int)
         for (int j = 0; j < durationTest; j++) {
-            xAxisLabels[j] = formatter.format(new Date((minStartTime + j) * intervalValue));
+            xAxisLabels[j] = formatter.format(Instant.ofEpochMilli((minStartTime + j) * intervalValue));
         }
         return xAxisLabels;
     }
@@ -740,7 +742,7 @@ public class RespTimeGraphVisualizer extends AbstractVisualizer implements Actio
     private int getIncrScaleYAxis() {
         int incrYAxisScale = 0;
         String iyas = incrScaleYAxis.getText();
-        if (iyas.length() != 0) {
+        if (!iyas.isEmpty()) {
             incrYAxisScale = Integer.parseInt(iyas);
         }
         return incrYAxisScale;

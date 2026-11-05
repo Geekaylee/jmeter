@@ -203,8 +203,7 @@ public class CookiePanel extends AbstractConfigGui implements ActionListener {
         GuiUtils.stopTableEditing(cookieTable);
         cm.clear();
         configureTestElement(cm);
-        if (cm instanceof CookieManager) {
-            CookieManager cookieManager = (CookieManager) cm;
+        if (cm instanceof CookieManager cookieManager) {
             for (int i = 0; i < tableModel.getRowCount(); i++) {
                 Cookie cookie = createCookie(tableModel.getRowData(i));
                 cookieManager.add(cookie);
@@ -238,7 +237,7 @@ public class CookiePanel extends AbstractConfigGui implements ActionListener {
         saveButton.setEnabled(hasRows);
     }
 
-    private Cookie createCookie(Object[] rowData) {
+    private static Cookie createCookie(Object[] rowData) {
         Cookie cookie = new Cookie(
                 (String) rowData[0],
                 (String) rowData[1],

@@ -17,7 +17,7 @@
 
 package org.apache.jorphan.exec;
 
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.File;
 import java.io.IOException;
@@ -47,7 +47,7 @@ public class TestKeyToolUtils {
         KeyToolUtils.generateProxyCA(keystore, password, validity);
     }
 
-    /*
+    /**
      * Check the assumption that a missing executable will generate
      * either an IOException or status which is neither 0 nor 1
      */

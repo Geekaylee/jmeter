@@ -313,22 +313,22 @@ public class HeaderPanel extends AbstractConfigGui implements ActionListener {
     private static class InnerTableModel extends AbstractTableModel {
         private static final long serialVersionUID = 240L;
 
-        private HeaderManager manager;
+        private final HeaderManager manager;
 
-        public InnerTableModel(HeaderManager man) {
+        private InnerTableModel(HeaderManager man) {
             manager = man;
         }
 
-        public void clearData() {
+        private void clearData() {
             manager.clear();
             fireTableDataChanged();
         }
 
-        public void removeRow(int row) {
+        private void removeRow(int row) {
             manager.remove(row);
         }
 
-        public void addNewRow() {
+        private void addNewRow() {
             manager.add();
         }
 

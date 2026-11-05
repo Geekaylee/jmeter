@@ -17,17 +17,17 @@
 
 package org.apache.jmeter.protocol.jms.sampler;
 
-import javax.jms.InvalidDestinationException;
-import javax.jms.JMSException;
-import javax.jms.Message;
-import javax.jms.MessageConsumer;
-import javax.jms.MessageProducer;
-import javax.jms.Queue;
-import javax.jms.Session;
-import javax.jms.TemporaryQueue;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import jakarta.jms.InvalidDestinationException;
+import jakarta.jms.JMSException;
+import jakarta.jms.Message;
+import jakarta.jms.MessageConsumer;
+import jakarta.jms.MessageProducer;
+import jakarta.jms.Queue;
+import jakarta.jms.Session;
+import jakarta.jms.TemporaryQueue;
 
 /**
  * The <code>TimeoutEnabledQueueRequestor</code> helper class simplifies making
@@ -44,9 +44,9 @@ import org.slf4j.LoggerFactory;
  */
 public class TimeoutEnabledQueueRequestor {
     private static final Logger logger = LoggerFactory.getLogger(TimeoutEnabledQueueRequestor.class);
-    private TemporaryQueue tempQueue;
-    private MessageProducer sender;
-    private MessageConsumer receiver;
+    private final TemporaryQueue tempQueue;
+    private final MessageProducer sender;
+    private final MessageConsumer receiver;
 
     /**
      * Constructor for the <code>TimeoutEnabledQueueRequestor</code> class.
@@ -59,11 +59,11 @@ public class TimeoutEnabledQueueRequestor {
      * @param session the <code>QueueSession</code> the queue belongs to, session will not be closed by {@link TimeoutEnabledQueueRequestor}
      * @param queue the queue to perform the request/reply call on
      *
-     * @exception JMSException
+     * @throws JMSException
      *                if the JMS provider fails to create the
      *                <code>TimeoutEnabledQueueRequestor</code> due to some
      *                internal error.
-     * @exception InvalidDestinationException
+     * @throws InvalidDestinationException
      *                if an invalid queue is specified.
      */
     public TimeoutEnabledQueueRequestor(Session session, Queue queue) throws JMSException {
@@ -81,7 +81,7 @@ public class TimeoutEnabledQueueRequestor {
      *
      * @return the reply message
      *
-     * @exception JMSException
+     * @throws JMSException
      *                if the JMS provider fails to complete the request due to
      *                some internal error.
      */
@@ -104,7 +104,7 @@ public class TimeoutEnabledQueueRequestor {
      *
      * @return the reply message
      *
-     * @exception JMSException
+     * @throws JMSException
      *                if the JMS provider fails to complete the request due to
      *                some internal error.
      */
@@ -128,7 +128,7 @@ public class TimeoutEnabledQueueRequestor {
      * This method closes the <code>Session</code> object passed to the
      * <code>TimeoutEnabledQueueRequestor</code> constructor.
      *
-     * @exception JMSException
+     * @throws JMSException
      *                if the JMS provider fails to close the
      *                <code>TimeoutEnabledQueueRequestor</code> due to some
      *                internal error.

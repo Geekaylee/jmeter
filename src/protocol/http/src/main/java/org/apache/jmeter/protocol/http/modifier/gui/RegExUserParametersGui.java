@@ -63,8 +63,7 @@ public class RegExUserParametersGui extends AbstractPreProcessorGui {
     @Override
     public void configure(TestElement el) {
         super.configure(el);
-        if (el instanceof RegExUserParameters){
-            RegExUserParameters re = (RegExUserParameters) el;
+        if (el instanceof RegExUserParameters re){
             paramNamesGrNrField.setText(re.getRegParamNamesGrNr());
             paramValuesGrNrField.setText(re.getRegExParamValuesGrNr());
             refRegExRefNameField.setText(re.getRegExRefName());
@@ -89,8 +88,7 @@ public class RegExUserParametersGui extends AbstractPreProcessorGui {
     @Override
     public void modifyTestElement(TestElement extractor) {
         super.configureTestElement(extractor);
-        if (extractor instanceof RegExUserParameters) {
-            RegExUserParameters regExUserParams = (RegExUserParameters) extractor;
+        if (extractor instanceof RegExUserParameters regExUserParams) {
             regExUserParams.setRegExRefName(refRegExRefNameField.getText());
             regExUserParams.setRegExParamNamesGrNr(paramNamesGrNrField.getText());
             regExUserParams.setRegExParamValuesGrNr(paramValuesGrNrField.getText());
@@ -136,7 +134,7 @@ public class RegExUserParametersGui extends AbstractPreProcessorGui {
         return panel;
     }
 
-    private void addField(JPanel panel, JLabeledTextField field, GridBagConstraints gbc) {
+    private static void addField(JPanel panel, JLabeledTextField field, GridBagConstraints gbc) {
         List<JComponent> item = field.getComponentList();
         panel.add(item.get(0), gbc.clone());
         gbc.gridx++;
@@ -146,14 +144,14 @@ public class RegExUserParametersGui extends AbstractPreProcessorGui {
     }
 
     // Next line
-    private void resetContraints(GridBagConstraints gbc) {
+    private static void resetContraints(GridBagConstraints gbc) {
         gbc.gridx = 0;
         gbc.gridy++;
         gbc.weightx = 0;
         gbc.fill=GridBagConstraints.NONE;
     }
 
-    private void initConstraints(GridBagConstraints gbc) {
+    private static void initConstraints(GridBagConstraints gbc) {
         gbc.anchor = GridBagConstraints.NORTHWEST;
         gbc.fill = GridBagConstraints.NONE;
         gbc.gridheight = 1;

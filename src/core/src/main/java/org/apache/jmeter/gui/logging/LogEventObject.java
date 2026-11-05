@@ -31,7 +31,7 @@ public class LogEventObject extends EventObject {
     private static final long serialVersionUID = 1L;
 
     private Level level;
-    private String seralizedString;
+    private final String seralizedString;
 
     public LogEventObject(Object source) {
         this(source, null);
@@ -39,8 +39,8 @@ public class LogEventObject extends EventObject {
 
     public LogEventObject(Object source, String seralizedString) {
         super(source);
-        if (source instanceof LogEvent) {
-            level = ((LogEvent) source).getLevel();
+        if (source instanceof LogEvent logEvent) {
+            level = logEvent.getLevel();
         }
         this.seralizedString = seralizedString;
     }

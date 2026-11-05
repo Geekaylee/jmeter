@@ -26,16 +26,16 @@ import java.io.StringWriter;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.text.MessageFormat;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.samplers.SampleResult;
 import org.apache.jmeter.testelement.AbstractTestElement;
 import org.apache.jmeter.testelement.property.BooleanProperty;
 import org.apache.jmeter.testelement.property.LongProperty;
 import org.apache.jmeter.testelement.property.StringProperty;
 import org.apache.jmeter.util.JMeterUtils;
+import org.apache.jorphan.util.StringUtilities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.tidy.Node;
@@ -100,9 +100,7 @@ public class HTMLAssertion extends AbstractTestElement implements Serializable, 
             return result;
         }
 
-        /*
-         * Run tidy.
-         */
+        // Run tidy.
         try {
             log.debug("HTMLAssertions.getResult(): start parsing with tidy ...");
 
@@ -124,7 +122,7 @@ public class HTMLAssertion extends AbstractTestElement implements Serializable, 
                 log.debug("Errors/warnings detected while parsing with tidy: {}", errbuf);
                 result.setFailure(true);
                 result.setFailureMessage(MessageFormat.format(
-                        "Tidy Parser errors: {} (allowed {}) Tidy Parser warnings: {} (allowed {})",
+                        "Tidy Parser errors: {0} (allowed {1}) Tidy Parser warnings: {2} (allowed {3})",
                         tidy.getParseErrors(), getErrorThreshold(), tidy.getParseWarnings(), getWarningThreshold()));
                 // return with an error
 
@@ -192,8 +190,8 @@ public class HTMLAssertion extends AbstractTestElement implements Serializable, 
         String filename = getFilename();
 
         // check if filename defined
-        if (StringUtils.isNotBlank(filename)) {
-            try (Writer writer = Files.newBufferedWriter(Paths.get(filename))) {
+        if (StringUtilities.isNotBlank(filename)) {
+            try (Writer writer = Files.newBufferedWriter(Path.of(filename))) {
                 // write to file
                 writer.write(inOutput);
                 log.debug("writeOutput() -> output successfully written to file: {}", filename);
@@ -248,7 +246,7 @@ public class HTMLAssertion extends AbstractTestElement implements Serializable, 
      *            used
      */
     public void setDoctype(String inDoctype) {
-        if (StringUtils.isAllBlank(inDoctype)) {
+        if (StringUtilities.isBlank(inDoctype)) {
             setProperty(new StringProperty(DOCTYPE_KEY, DEFAULT_DOCTYPE));
         } else {
             setProperty(new StringProperty(DOCTYPE_KEY, inDoctype));
@@ -264,7 +262,7 @@ public class HTMLAssertion extends AbstractTestElement implements Serializable, 
         setProperty(new BooleanProperty(ERRORS_ONLY_KEY, inErrorsOnly));
     }
 
-    private long capToZero(long value) {
+    private static long capToZero(long value) {
         if (value == Long.MAX_VALUE) {
             return 0;
         }

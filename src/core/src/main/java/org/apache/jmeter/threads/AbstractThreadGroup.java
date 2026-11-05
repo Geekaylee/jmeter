@@ -18,22 +18,25 @@
 package org.apache.jmeter.threads;
 
 import java.io.Serializable;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+import java.time.Duration;
+import java.util.IdentityHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.jmeter.control.Controller;
+import org.apache.jmeter.control.IteratingController;
 import org.apache.jmeter.control.LoopController;
 import org.apache.jmeter.engine.StandardJMeterEngine;
+import org.apache.jmeter.engine.TreeCloner;
 import org.apache.jmeter.engine.event.LoopIterationListener;
 import org.apache.jmeter.samplers.Sampler;
 import org.apache.jmeter.testelement.AbstractTestElement;
 import org.apache.jmeter.testelement.TestElement;
-import org.apache.jmeter.testelement.property.BooleanProperty;
-import org.apache.jmeter.testelement.property.IntegerProperty;
 import org.apache.jmeter.testelement.property.JMeterProperty;
-import org.apache.jmeter.testelement.property.TestElementProperty;
+import org.apache.jmeter.testelement.schema.PropertiesAccessor;
+import org.apache.jmeter.util.JMeterUtils;
 import org.apache.jorphan.collections.ListedHashTree;
+import org.apiguardian.api.API;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * ThreadGroup holds the settings for a JMeter thread group.
@@ -46,9 +49,13 @@ public abstract class AbstractThreadGroup extends AbstractTestElement
     private static final long serialVersionUID = 240L;
 
     // Only create the map if it is required
-    private final transient ConcurrentMap<TestElement, Object> children = new ConcurrentHashMap<>();
+    private final transient IdentityHashMap<TestElement, Object> children = new IdentityHashMap<>();
 
     private static final Object DUMMY = new Object();
+
+    public static final Duration DEFAULT_THREAD_STOP_TIMEOUT =
+            Duration.ofMillis(
+                    JMeterUtils.getPropDefault("jmeterengine.threadstop.wait", 5 * 1000L));
 
     /** Action to be taken when a Sampler error occurs */
     public static final String ON_SAMPLE_ERROR = "ThreadGroup.on_sample_error"; // int
@@ -79,6 +86,38 @@ public abstract class AbstractThreadGroup extends AbstractTestElement
 
     private final AtomicInteger numberOfThreads = new AtomicInteger(0); // Number of active threads in this group
 
+    private long startTime;
+
+    @Override
+    public AbstractThreadGroupSchema getSchema() {
+        return AbstractThreadGroupSchema.INSTANCE;
+    }
+
+    @NotNull
+    @Override
+    public PropertiesAccessor<? extends AbstractThreadGroup, ? extends AbstractThreadGroupSchema> getProps() {
+        return new PropertiesAccessor<>(this, getSchema());
+    }
+
+    /**
+     * Get the time when this thread group has been started
+     * @since 6.0.0
+     * @return time in milliseconds since epoch
+     */
+    public long getStartTime() {
+        return startTime;
+    }
+
+    /**
+     * Set the time when this thread group has been started.<br>
+     * Will probably be set by StandardJMeterEngine.
+     * @since 6.0.0
+     * @param startTime time in milliseconds since epoch
+     */
+    public void setStartTime(long startTime) {
+        this.startTime = startTime;
+    }
+
     /** {@inheritDoc} */
     @Override
     public boolean isDone() {
@@ -97,7 +136,7 @@ public abstract class AbstractThreadGroup extends AbstractTestElement
      * @return the sampler controller.
      */
     public Controller getSamplerController() {
-        return (Controller) getProperty(MAIN_CONTROLLER).getObjectValue();
+        return get(getSchema().getMainController());
     }
 
     /**
@@ -108,7 +147,7 @@ public abstract class AbstractThreadGroup extends AbstractTestElement
      */
     public void setSamplerController(LoopController c) {
         c.setContinueForever(false);
-        setProperty(new TestElementProperty(MAIN_CONTROLLER, c));
+        set(getSchema().getMainController(), c);
     }
 
     /**
@@ -127,9 +166,11 @@ public abstract class AbstractThreadGroup extends AbstractTestElement
      */
     @Override
     public final boolean addTestElementOnce(TestElement child){
-        if (children.putIfAbsent(child, DUMMY) == null) {
-            addTestElement(child);
-            return true;
+        synchronized (children) {
+            if (children.putIfAbsent(child, DUMMY) == null) {
+                addTestElement(child);
+                return true;
+            }
         }
         return false;
     }
@@ -160,7 +201,7 @@ public abstract class AbstractThreadGroup extends AbstractTestElement
      * Start next iteration after an error
      */
     public void startNextLoop() {
-       ((LoopController) getSamplerController()).startNextLoop();
+       ((IteratingController) getSamplerController()).startNextLoop();
     }
 
     /**
@@ -178,7 +219,7 @@ public abstract class AbstractThreadGroup extends AbstractTestElement
      *            the number of threads.
      */
     public void setNumThreads(int numThreads) {
-        setProperty(new IntegerProperty(NUM_THREADS, numThreads));
+        set(getSchema().getNumThreads(), numThreads);
     }
 
     /**
@@ -210,7 +251,11 @@ public abstract class AbstractThreadGroup extends AbstractTestElement
      * @return the number of threads.
      */
     public int getNumThreads() {
-        return this.getPropertyAsInt(AbstractThreadGroup.NUM_THREADS);
+        return get(getSchema().getNumThreads());
+    }
+
+    private String getOnSampleError() {
+        return get(getSchema().getOnSampleError());
     }
 
     /**
@@ -219,7 +264,7 @@ public abstract class AbstractThreadGroup extends AbstractTestElement
      * @return true if thread should start next loop
      */
     public boolean getOnErrorStartNextLoop() {
-        return getPropertyAsString(AbstractThreadGroup.ON_SAMPLE_ERROR).equalsIgnoreCase(ON_SAMPLE_ERROR_START_NEXT_LOOP);
+        return getOnSampleError().equalsIgnoreCase(ON_SAMPLE_ERROR_START_NEXT_LOOP);
     }
 
     /**
@@ -228,7 +273,7 @@ public abstract class AbstractThreadGroup extends AbstractTestElement
      * @return true if thread should stop
      */
     public boolean getOnErrorStopThread() {
-        return getPropertyAsString(AbstractThreadGroup.ON_SAMPLE_ERROR).equalsIgnoreCase(ON_SAMPLE_ERROR_STOPTHREAD);
+        return getOnSampleError().equalsIgnoreCase(ON_SAMPLE_ERROR_STOPTHREAD);
     }
 
     /**
@@ -237,7 +282,7 @@ public abstract class AbstractThreadGroup extends AbstractTestElement
      * @return true if test (all threads) should stop
      */
     public boolean getOnErrorStopTest() {
-        return getPropertyAsString(AbstractThreadGroup.ON_SAMPLE_ERROR).equalsIgnoreCase(ON_SAMPLE_ERROR_STOPTEST);
+        return getOnSampleError().equalsIgnoreCase(ON_SAMPLE_ERROR_STOPTEST);
     }
 
     /**
@@ -246,7 +291,7 @@ public abstract class AbstractThreadGroup extends AbstractTestElement
      * @return true if test (all threads) should stop immediately
      */
     public boolean getOnErrorStopTestNow() {
-        return getPropertyAsString(AbstractThreadGroup.ON_SAMPLE_ERROR).equalsIgnoreCase(ON_SAMPLE_ERROR_STOPTEST_NOW);
+        return getOnSampleError().equalsIgnoreCase(ON_SAMPLE_ERROR_STOPTEST_NOW);
     }
 
     /**
@@ -301,7 +346,7 @@ public abstract class AbstractThreadGroup extends AbstractTestElement
     public abstract void stop();
 
     public void breakThreadLoop() {
-        ((LoopController) getSamplerController()).breakLoop();
+        ((IteratingController) getSamplerController()).breakLoop();
     }
 
     /**
@@ -312,7 +357,7 @@ public abstract class AbstractThreadGroup extends AbstractTestElement
      *            false is a different user on next iteration of loop
      */
     public void setIsSameUserOnNextIteration(boolean isSameUserOnNextIteration) {
-        setProperty(new BooleanProperty(IS_SAME_USER_ON_NEXT_ITERATION, isSameUserOnNextIteration));
+        set(getSchema().getSameUserOnNextIteration(), isSameUserOnNextIteration);
     }
 
     /**
@@ -324,6 +369,56 @@ public abstract class AbstractThreadGroup extends AbstractTestElement
      * @return the kind of user.
      */
     public boolean isSameUserOnNextIteration() {
-        return getPropertyAsBoolean(ThreadGroup.IS_SAME_USER_ON_NEXT_ITERATION, true);
+        return get(getSchema().getSameUserOnNextIteration());
+    }
+
+    /**
+     * Create {@link JMeterThread}. Note: the input tree is not cloned.
+     * @param engine {@link StandardJMeterEngine}
+     * @param monitor {@link JMeterThreadMonitor}
+     * @param notifier {@link ListenerNotifier}
+     * @param groupNumber  thread group number
+     * @param threadNumber int thread number
+     * @param threadGroupTree {@link ListedHashTree}
+     * @param variables initial variables
+     * @return {@link JMeterThread}
+     */
+    @API(status = API.Status.EXPERIMENTAL, since = "5.5")
+    protected JMeterThread makeThread(
+            StandardJMeterEngine engine,
+            JMeterThreadMonitor monitor, ListenerNotifier notifier,
+            int groupNumber, int threadNumber,
+            ListedHashTree threadGroupTree,
+            JMeterVariables variables) {
+        boolean onErrorStopTest = getOnErrorStopTest();
+        boolean onErrorStopTestNow = getOnErrorStopTestNow();
+        boolean onErrorStopThread = getOnErrorStopThread();
+        boolean onErrorStartNextLoop = getOnErrorStartNextLoop();
+        String groupName = getName();
+        final JMeterThread jmeterThread = new JMeterThread(threadGroupTree, monitor, notifier, isSameUserOnNextIteration());
+        jmeterThread.setThreadNum(threadNumber);
+        jmeterThread.setThreadGroup(this);
+        jmeterThread.putVariables(variables);
+        String distributedPrefix =
+                JMeterUtils.getPropDefault(JMeterUtils.THREAD_GROUP_DISTRIBUTED_PREFIX_PROPERTY_NAME, "");
+        final String threadName = distributedPrefix + (distributedPrefix.isEmpty() ? "":"-") +groupName + " " + groupNumber + "-" + (threadNumber + 1);
+        jmeterThread.setThreadName(threadName);
+        jmeterThread.setEngine(engine);
+        jmeterThread.setOnErrorStopTest(onErrorStopTest);
+        jmeterThread.setOnErrorStopTestNow(onErrorStopTestNow);
+        jmeterThread.setOnErrorStopThread(onErrorStopThread);
+        jmeterThread.setOnErrorStartNextLoop(onErrorStartNextLoop);
+        return jmeterThread;
+    }
+
+    /**
+     * @param tree {@link ListedHashTree}
+     * @return a clone of tree
+     */
+    @API(status = API.Status.EXPERIMENTAL, since = "5.5")
+    public static ListedHashTree cloneTree(ListedHashTree tree) {
+        TreeCloner cloner = new TreeCloner(true);
+        tree.traverse(cloner);
+        return cloner.getClonedTree();
     }
 }

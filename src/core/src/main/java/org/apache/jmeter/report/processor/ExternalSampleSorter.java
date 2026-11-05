@@ -22,6 +22,7 @@ import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Objects;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -29,7 +30,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.commons.lang3.Validate;
 import org.apache.jmeter.report.core.CsvFile;
 import org.apache.jmeter.report.core.CsvSampleReader;
 import org.apache.jmeter.report.core.CsvSampleWriter;
@@ -79,8 +79,6 @@ import org.slf4j.LoggerFactory;
  */
 public class ExternalSampleSorter extends AbstractSampleConsumer {
 
-    private static final String MUST_NOT_BE_NULL = "%s must not be null";
-
     private static final Logger LOG = LoggerFactory.getLogger(ExternalSampleSorter.class);
 
     private static final int DEFAULT_CHUNK_SIZE = 50000;
@@ -91,9 +89,9 @@ public class ExternalSampleSorter extends AbstractSampleConsumer {
 
     private final BlockingQueue<Runnable> workQueue = new LinkedBlockingQueue<>();
 
-    private ThreadPoolExecutor pool;
+    private final ThreadPoolExecutor pool;
 
-    private volatile int nbProcessors;
+    private final int nbProcessors;
 
     private boolean parallelize;
 
@@ -219,7 +217,7 @@ public class ExternalSampleSorter extends AbstractSampleConsumer {
      */
     public void sort(SampleMetadata sampleMetadata, File inputFile,
             File outputFile, boolean writeHeader) {
-        Validate.notNull(sampleMetadata, MUST_NOT_BE_NULL, "sampleMetadata");
+        Objects.requireNonNull(sampleMetadata, "sampleMetadata must not be null");
 
         if (!inputFile.isFile()) {
             throw new SampleException(
@@ -250,7 +248,7 @@ public class ExternalSampleSorter extends AbstractSampleConsumer {
      */
     private void sort(CsvSampleReader csvReader, File output,
             boolean writeHeader) {
-        Validate.notNull(output, MUST_NOT_BE_NULL, "output");
+        Objects.requireNonNull(output, "output must not be null");
 
         SampleMetadata readSampleMetadata = csvReader.getMetadata();
         SampleWriterConsumer writerConsumer = new SampleWriterConsumer();
@@ -272,8 +270,9 @@ public class ExternalSampleSorter extends AbstractSampleConsumer {
 
     @Override
     public void startConsuming() {
-        Validate.validState(sampleComparator != null,
-                "sampleComparator is not set, call setSampleComparator() first.");
+        if (sampleComparator == null) {
+            throw new IllegalStateException("sampleComparator is not set, call setSampleComparator() first.");
+        }
 
         File workDir = getWorkingDirectory();
         workDir.mkdir();

@@ -76,8 +76,7 @@ public class RegexExtractorGui extends AbstractPostProcessorGui {
     @Override
     public void configure(TestElement el) {
         super.configure(el);
-        if (el instanceof RegexExtractor){
-            RegexExtractor re = (RegexExtractor) el;
+        if (el instanceof RegexExtractor re){
             showScopeSettings(re, true);
             useHeaders.setSelected(re.useHeaders());
             useRequestHeaders.setSelected(re.useRequestHeaders());
@@ -114,8 +113,7 @@ public class RegexExtractorGui extends AbstractPostProcessorGui {
     @Override
     public void modifyTestElement(TestElement extractor) {
         super.configureTestElement(extractor);
-        if (extractor instanceof RegexExtractor) {
-            RegexExtractor regex = (RegexExtractor) extractor;
+        if (extractor instanceof RegexExtractor regex) {
             saveScopeSettings(regex);
             regex.setUseField(group.getSelection().getActionCommand());
             regex.setRefName(refNameField.getText());
@@ -244,7 +242,7 @@ public class RegexExtractorGui extends AbstractPostProcessorGui {
         return panel;
     }
 
-    private void addField(JPanel panel, JLabeledTextField field, GridBagConstraints gbc) {
+    private static void addField(JPanel panel, JLabeledTextField field, GridBagConstraints gbc) {
         List<JComponent> item = field.getComponentList();
         panel.add(item.get(0), gbc.clone());
         gbc.gridx++;
@@ -254,14 +252,14 @@ public class RegexExtractorGui extends AbstractPostProcessorGui {
     }
 
     // Next line
-    private void resetContraints(GridBagConstraints gbc) {
+    private static void resetContraints(GridBagConstraints gbc) {
         gbc.gridx = 0;
         gbc.gridy++;
         gbc.weightx = 0;
         gbc.fill=GridBagConstraints.NONE;
     }
 
-    private void initConstraints(GridBagConstraints gbc) {
+    private static void initConstraints(GridBagConstraints gbc) {
         gbc.anchor = GridBagConstraints.NORTHWEST;
         gbc.fill = GridBagConstraints.NONE;
         gbc.gridheight = 1;

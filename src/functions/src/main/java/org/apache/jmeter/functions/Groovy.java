@@ -29,7 +29,6 @@ import java.util.Properties;
 import javax.script.Bindings;
 import javax.script.ScriptEngine;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.engine.util.CompoundVariable;
 import org.apache.jmeter.samplers.SampleResult;
 import org.apache.jmeter.samplers.Sampler;
@@ -38,14 +37,18 @@ import org.apache.jmeter.threads.JMeterContextService;
 import org.apache.jmeter.threads.JMeterVariables;
 import org.apache.jmeter.util.JMeterUtils;
 import org.apache.jmeter.util.JSR223TestElement;
+import org.apache.jorphan.util.StringUtilities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.auto.service.AutoService;
 
 /**
  * __groovy function
  * Provides a Groovy interpreter
  * @since 3.1
  */
+@AutoService(Function.class)
 public class Groovy extends AbstractFunction {
     private static final Logger log = LoggerFactory.getLogger(Groovy.class);
 
@@ -122,12 +125,12 @@ public class Groovy extends AbstractFunction {
                 resultStr = out.toString();
             }
 
-            if (varName.length() > 0 && vars != null) {// vars will be null on TestPlan
+            if (!varName.isEmpty() && vars != null) {// vars will be null on TestPlan
                 vars.put(varName, resultStr);
             }
         } catch (Exception ex) // Mainly for bsh.EvalError
         {
-            log.warn("Error running groovy script", ex);
+            log.warn("Error running Groovy script in element named: '{}'", currentSampler.getName(), ex);
         }
         log.debug("__groovy({},{})={}",script, varName, resultStr);
         return resultStr;
@@ -141,7 +144,7 @@ public class Groovy extends AbstractFunction {
         scriptEngine = JSR223TestElement.getInstance().getEngineByName(GROOVY_ENGINE_NAME); //$NON-NLS-N$
 
         String fileName = JMeterUtils.getProperty(INIT_FILE);
-        if(!StringUtils.isEmpty(fileName)) {
+        if (StringUtilities.isNotEmpty(fileName)) {
             File file = new File(fileName);
             if(!(file.exists() && file.canRead())) {
                 // File maybe relative to JMeter home

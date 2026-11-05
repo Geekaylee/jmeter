@@ -17,10 +17,11 @@
 
 package org.apache.jmeter.assertions;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.jmeter.junit.JMeterTestCase;
 import org.apache.jmeter.samplers.SampleResult;
@@ -36,7 +37,11 @@ public class SizeAssertionTest extends JMeterTestCase {
     private SampleResult sample0;
     private SampleResult sample1;
     private AssertionResult result;
-    private final String data1 = "response Data\n" + "line 2\n\nEOF";
+    private final String data1 = """
+            response Data
+            line 2
+
+            EOF""";
     private final int data1Len = data1.length();
 
     @BeforeEach
@@ -54,7 +59,7 @@ public class SizeAssertionTest extends JMeterTestCase {
 
     @Test
     public void testSizeAssertionEquals() throws Exception {
-        assertion.setCompOper(SizeAssertion.EQUAL);
+        assertion.setCompOper(SizeAssertion.ComparisonOperator.EQUAL.getValue());
         assertion.setAllowedSize(0);
         result = assertion.getResult(sample1);
         assertFailed();
@@ -72,7 +77,7 @@ public class SizeAssertionTest extends JMeterTestCase {
 
     @Test
     public void testSizeAssertionNotEquals() throws Exception {
-        assertion.setCompOper(SizeAssertion.NOTEQUAL);
+        assertion.setCompOper(SizeAssertion.ComparisonOperator.NOTEQUAL.getValue());
         assertion.setAllowedSize(0);
         result = assertion.getResult(sample1);
         assertPassed();
@@ -90,7 +95,7 @@ public class SizeAssertionTest extends JMeterTestCase {
 
     @Test
     public void testSizeAssertionGreaterThan() throws Exception {
-        assertion.setCompOper(SizeAssertion.GREATERTHAN);
+        assertion.setCompOper(SizeAssertion.ComparisonOperator.GREATERTHAN.getValue());
         assertion.setAllowedSize(0);
         result = assertion.getResult(sample1);
         assertPassed();
@@ -108,7 +113,7 @@ public class SizeAssertionTest extends JMeterTestCase {
 
     @Test
     public void testSizeAssertionGreaterThanEqual() throws Exception {
-        assertion.setCompOper(SizeAssertion.GREATERTHANEQUAL);
+        assertion.setCompOper(SizeAssertion.ComparisonOperator.GREATERTHANEQUAL.getValue());
         assertion.setAllowedSize(0);
         result = assertion.getResult(sample1);
         assertPassed();
@@ -126,7 +131,7 @@ public class SizeAssertionTest extends JMeterTestCase {
 
     @Test
     public void testSizeAssertionLessThan() throws Exception {
-        assertion.setCompOper(SizeAssertion.LESSTHAN);
+        assertion.setCompOper(SizeAssertion.ComparisonOperator.LESSTHAN.getValue());
         assertion.setAllowedSize(0);
         result = assertion.getResult(sample1);
         assertFailed();
@@ -144,7 +149,7 @@ public class SizeAssertionTest extends JMeterTestCase {
 
     @Test
     public void testSizeAssertionLessThanEqual() throws Exception {
-        assertion.setCompOper(SizeAssertion.LESSTHANEQUAL);
+        assertion.setCompOper(SizeAssertion.ComparisonOperator.LESSTHANEQUAL.getValue());
         assertion.setAllowedSize(0);
         result = assertion.getResult(sample1);
         assertFailed();
@@ -162,14 +167,14 @@ public class SizeAssertionTest extends JMeterTestCase {
     // TODO - need a lot more tests
 
     private void assertPassed() throws Exception {
-        assertNull("Failure message should be null", result.getFailureMessage());
+        assertNull(result.getFailureMessage(), "Failure message should be null");
         assertFalse(result.isError());
         assertFalse(result.isFailure());
     }
 
     private void assertFailed() throws Exception {
-        assertNotNull("Failure message should not be null", result.getFailureMessage());
-        assertFalse("Should not be: Response was null", "Response was null".equals(result.getFailureMessage()));
+        assertNotNull(result.getFailureMessage(), "Failure message should not be null");
+        assertNotEquals("Response was null", result.getFailureMessage(), "Should not be: Response was null");
         assertFalse(result.isError());
         assertTrue(result.isFailure());
     }

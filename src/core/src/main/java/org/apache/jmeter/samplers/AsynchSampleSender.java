@@ -129,11 +129,11 @@ public class AsynchSampleSender extends AbstractSampleSender implements Serializ
 
     private static class Worker extends Thread {
 
-        private final BlockingQueue<SampleEvent> queue;
+        private final BlockingQueue<? extends SampleEvent> queue;
 
         private final RemoteSampleListener listener;
 
-        private Worker(BlockingQueue<SampleEvent> q, RemoteSampleListener l){
+        private Worker(BlockingQueue<? extends SampleEvent> q, RemoteSampleListener l){
             queue = q;
             listener = l;
         }
@@ -147,7 +147,11 @@ public class AsynchSampleSender extends AbstractSampleSender implements Serializ
                     SampleEvent e = queue.take();
                     // try to process as many as possible
                     // The == comparison is not an error
-                    while (!(eof = e == FINAL_EVENT) && e != null) {
+                    while (e != null) {
+                        eof = e == FINAL_EVENT;
+                        if (eof) {
+                            break;
+                        }
                         l.add(e);
                         e = queue.poll(); // returns null if nothing on queue currently
                     }

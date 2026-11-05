@@ -17,8 +17,8 @@
 
 package org.apache.jmeter.testbeans.gui;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.beans.PropertyEditor;
 import java.beans.PropertyEditorManager;
@@ -33,7 +33,7 @@ import org.junit.jupiter.api.Test;
  */
 public class TestBooleanPropertyEditor {
 
-     // N.B. These values are NOT the same as Boolean.FALSE|TRUE.toString()
+     // N.B. These values are NOT the same as false|TRUE.toString()
      // which returns lower-case only.
      // The getAsText() method converts the result to mixed case.
     private static final String FALSE = "False"; // $NON-NLS-1$
@@ -51,33 +51,33 @@ public class TestBooleanPropertyEditor {
         testBooleanEditor(propertyEditor);
     }
 
-    private void testBooleanEditor(PropertyEditor propertyEditor) {
-        assertNotNull("Expected to find property editor", propertyEditor);
+    private static void testBooleanEditor(PropertyEditor propertyEditor) {
+        assertNotNull(propertyEditor, "Expected to find property editor");
         String[] tags = propertyEditor.getTags();
-        assertEquals(2,tags.length);
-        assertEquals(TRUE,tags[0]);
-        assertEquals(FALSE,tags[1]);
+        assertEquals(2, tags.length);
+        assertEquals(TRUE, tags[0]);
+        assertEquals(FALSE, tags[1]);
 
-        propertyEditor.setValue(Boolean.FALSE);
-        assertEquals(FALSE,propertyEditor.getAsText());
+        propertyEditor.setValue(false);
+        assertEquals(FALSE, propertyEditor.getAsText());
         propertyEditor.setAsText(FALSE);
-        assertEquals(FALSE,propertyEditor.getAsText());
+        assertEquals(FALSE, propertyEditor.getAsText());
         propertyEditor.setAsText("false");
-        assertEquals(FALSE,propertyEditor.getAsText());
+        assertEquals(FALSE, propertyEditor.getAsText());
         propertyEditor.setAsText("False");
-        assertEquals(FALSE,propertyEditor.getAsText());
+        assertEquals(FALSE, propertyEditor.getAsText());
         propertyEditor.setAsText("FALSE");
-        assertEquals(FALSE,propertyEditor.getAsText());
+        assertEquals(FALSE, propertyEditor.getAsText());
 
-        propertyEditor.setValue(Boolean.TRUE);
-        assertEquals(TRUE,propertyEditor.getAsText());
+        propertyEditor.setValue(true);
+        assertEquals(TRUE, propertyEditor.getAsText());
         propertyEditor.setAsText(TRUE);
-        assertEquals(TRUE,propertyEditor.getAsText());
+        assertEquals(TRUE, propertyEditor.getAsText());
         propertyEditor.setAsText("true");
-        assertEquals(TRUE,propertyEditor.getAsText());
+        assertEquals(TRUE, propertyEditor.getAsText());
         propertyEditor.setAsText("True");
-        assertEquals(TRUE,propertyEditor.getAsText());
+        assertEquals(TRUE, propertyEditor.getAsText());
         propertyEditor.setAsText("TRUE");
-        assertEquals(TRUE,propertyEditor.getAsText());
+        assertEquals(TRUE, propertyEditor.getAsText());
     }
 }

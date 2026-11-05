@@ -92,8 +92,7 @@ public class BoundaryExtractorGui extends AbstractPostProcessorGui {
     @Override
     public void configure(TestElement el) {
         super.configure(el);
-        if (el instanceof BoundaryExtractor){
-            BoundaryExtractor boundary = (BoundaryExtractor) el;
+        if (el instanceof BoundaryExtractor boundary){
             showScopeSettings(boundary, true);
             useHeaders.setSelected(boundary.useHeaders());
             useRequestHeaders.setSelected(boundary.useRequestHeaders());
@@ -130,8 +129,7 @@ public class BoundaryExtractorGui extends AbstractPostProcessorGui {
     @Override
     public void modifyTestElement(TestElement extractor) {
         super.configureTestElement(extractor);
-        if (extractor instanceof BoundaryExtractor) {
-            BoundaryExtractor boundary = (BoundaryExtractor) extractor;
+        if (extractor instanceof BoundaryExtractor boundary) {
             saveScopeSettings(boundary);
             boundary.setUseField(group.getSelection().getActionCommand());
             boundary.setRefName(refNameField.getText());
@@ -259,7 +257,7 @@ public class BoundaryExtractorGui extends AbstractPostProcessorGui {
         return panel;
     }
 
-    private void addField(JPanel panel, JLabeledTextField field, GridBagConstraints gbc) {
+    private static void addField(JPanel panel, JLabeledTextField field, GridBagConstraints gbc) {
         List<JComponent> item = field.getComponentList();
         panel.add(item.get(0), gbc.clone());
         gbc.gridx++;
@@ -269,14 +267,14 @@ public class BoundaryExtractorGui extends AbstractPostProcessorGui {
     }
 
     // Next line
-    private void resetContraints(GridBagConstraints gbc) {
+    private static void resetContraints(GridBagConstraints gbc) {
         gbc.gridx = 0;
         gbc.gridy++;
         gbc.weightx = 0;
         gbc.fill=GridBagConstraints.NONE;
     }
 
-    private void initConstraints(GridBagConstraints gbc) {
+    private static void initConstraints(GridBagConstraints gbc) {
         gbc.anchor = GridBagConstraints.NORTHWEST;
         gbc.fill = GridBagConstraints.NONE;
         gbc.gridheight = 1;

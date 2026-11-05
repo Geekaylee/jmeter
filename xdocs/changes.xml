@@ -18,10 +18,15 @@
 
 <!DOCTYPE document
 [
-<!ENTITY hellip   "&#x02026;" >
-<!ENTITY rarr     "&#x02192;" >
-<!ENTITY vellip   "&#x022EE;" >
-<!ENTITY nbsp     "&#x00A0;" >
+<!ENTITY hellip   "&#x02026;">
+<!ENTITY le       "&#x02264;">
+<!ENTITY nbsp     "&#x000A0;">
+<!ENTITY ndash    "&#x02013;">
+<!ENTITY oacute   "&#x000F3;">
+<!ENTITY rarr     "&#x02192;">
+<!ENTITY rArr     "&#x021D2;">
+<!ENTITY THORN    "&#x000DE;">
+<!ENTITY vellip   "&#x022EE;">
 ]>
 <document>
 <properties>
@@ -40,171 +45,123 @@ h3 { color: #960000; }
 Earlier changes are detailed in the <a href="changes_history.html">History of Previous Changes</a>.
 </note>
 
+<br></br>
+<note>
+JMeter 6.x requires Java 17 or later for execution (Java 21 is recommended).
+</note>
 
-<!--  =================== 5.5 =================== -->
+<!--  =================== 6.0.0 =================== -->
 
-<h1>Version 5.5</h1>
+<h1>Version 6.0.0 </h1>
 <p>
 Summary
 </p>
 <ul>
-<li><a href="#New and Noteworthy">New and Noteworthy</a></li>
 <li><a href="#Incompatible changes">Incompatible changes</a></li>
+<li><a href="#Changes">Changes</a></li>
 <li><a href="#Bug fixes">Bug fixes</a></li>
-<li><a href="#Improvements">Improvements</a></li>
-<li><a href="#Non-functional changes">Non-functional changes</a></li>
-<li><a href="#Known problems and workarounds">Known problems and workarounds</a></li>
-<li><a href="#Thanks">Thanks</a></li>
-
 </ul>
-
-<ch_section>New and Noteworthy</ch_section>
-<!--
-<ch_title>Core improvements</ch_title>
-<ch_title>Test Plan</ch_title>
-<ch_title>Scripting / Debugging enhancements</ch_title>
-<ch_title>Functions</ch_title>
--->
-<ch_title>UX improvements</ch_title>
 
 <!-- =================== Incompatible changes =================== -->
 
 <ch_section>Incompatible changes</ch_section>
 <ul>
-</ul>
-<!-- =================== Improvements =================== -->
-
-<ch_section>Improvements</ch_section>
-
-<h3>HTTP Samplers and Test Script Recorder</h3>
-<ul>
-  <li><bug>65027</bug>Detect mime-type for files automatically when adding files to HTTP Sampler</li>
-  <li><bug>65020</bug>HTTP Sampler/Files upload tab - add missing buttons</li>
-  <li><pr>650</pr>HTTP Sampler timestamp fix when exception is caught. Contributed by Konstantin Kalinin (konstantin at kkalinin.pro)</li>
-  <li><bug>65328</bug><pr>666</pr>HTTP 308 Permanent Redirect is not supported. Contributed by
-    Baptiste Gaillard (baptiste.gaillard at gmail.com)</li>
+  <li><issue>6428</issue>HTTP Cookie Manager no longer sends cookies after they reached their expiry time.
+  Previously, expired cookies kept being sent indefinitely. Long-running tests that outlive a cookie's
+  expiry time may experience authentication or session failures and must handle re-authentication
+  or session refresh.</li>
+  <li><pr>6573</pr>The deprecated MongoDB Script sampler and MongoDB Source Config elements have been removed,
+  together with the bundled MongoDB Java driver (<code>mongo-java-driver</code>). Test plans that use them
+  can no longer be loaded; use a JSR223 Sampler with the MongoDB Java driver of your choice instead.</li>
 </ul>
 
-<h3>Other samplers</h3>
-<ul>
-  <li><bug>65149</bug><pr>644</pr>Encode the personal part of email addresses in SMTP Sampler</li>
-  <li><pr>638</pr>Various additions to the Bolt Sampler. Added <code>transaction timeout</code>, <code>database</code>
-    option required for Neo4j 4.x (with multi-database support) and <code>access mode</code> option, that allows running
-    against a Neo4j Enterprise Causal Cluster. Contributed by David Pecollet (david.pecollet at gmail.com)</li>
-</ul>
+  <ch_section>Changes</ch_section>
+  <h3>General</h3>
+  <ul>
+    <li><pr>6220</pr> Require Java 17 or later for running JMeter</li>
+    <li><pr>6550</pr> Require Kotlin 1.9 or later for running JMeter</li>
+    <li><pr>6274</pr> Change references to old MySQL driver to new class <code>com.mysql.cj.jdbc.Driver</code></li>
+    <li><issue>6352</issue> Calculate delays in Open Model Thread Group and Precise Throughput
+        Timer relative to start of Thread Group instead of the start of the test.</li>
+    <li><issue>6357</issue><pr>6358</pr> Ensure writable directories when copying template files while report generation.</li>
+    <li><pr>6509</pr><pr>6675</pr> Synchronize recent file menu across multiple JVMs. Contributed by Corneliu C (https://github.com/KingRabbid)</li>
+    <li><pr>6596</pr>Fallback to English locale when loading test plans that use string values for enum properties, so old sample plans load correctly even with non-English locales.</li>
+  </ul>
 
-<h3>Controllers</h3>
-<ul>
-  <li><pr>665</pr>Increase visible lines of code in <code>IfController</code> and <code>WhileController</code>.
-    Based on an idea by David Getzlaff (david.getzlaff at t-systems.com>).</li>
-</ul>
+  <h3>HTTP Samplers and Test Script Recorder</h3>
+  <ul>
+    <li><pr>5891</pr>Skip Internet Explorer 6-9 conditional comment processing when fetching resource links</li>
+    <li><issue>5466</issue>Allow enabling or disabling individual HTTP request arguments in the HTTP Sampler UI. Contributed by Pasquale Pochop (github.com/pochopsp)</li>
+    <li><issue>6250</issue>Avoid adding "; charset=" automatically to <code>multipart/form-data</code> requests to align behavior with modern HTTP clients.</li>
+    <li><issue>6080</issue>Preserve the original HTTP method when following 307 and 308 redirects according to the HTTP specification. Contributed by LeeJiWon (github.com/dlwldnjs1009)</li>
+    <li><issue>6267</issue><pr>6268</pr>Add a space between key and value after <code>:</code> in View Results Tree &gt; Sampler result tab for better readability.</li>
+    <li><issue>5081</issue><issue>4023</issue><pr>6742</pr>Add the new <code>HttpClient5</code> sampler implementation, which is based on Apache HttpComponents HttpClient 5.x and can be selected in the <code>Implementation</code> combo box of the HTTP Request sampler and the HTTP Request Defaults, or with the <code>jmeter.httpsampler</code> property. It supports the features of the existing <code>HttpClient4</code> implementation (cookie, cache, header and authorization management, proxies, client certificates over HTTP/1.1, WebDav methods, DNS Cache Manager and connection reuse) and adds HTTP/2 support. Automatic retries are disabled.</li>
+    <li><pr>6742</pr>Add the <code>HTTP Version</code> combo box (property <code>HTTPSampler.httpVersion</code>) to the HTTP Request sampler and the HTTP Request Defaults, so the HTTP version can be selected per sampler instead of only globally with the <code>httpclient.version</code> property. An empty value keeps using that property, which now defaults to <code>HTTP/1.1</code>.</li>
+    <li><pr>6742</pr>Send a <code>Host</code> header of the HTTP Header Manager without its port when that port is the default one of the URL in the <code>HttpClient5</code> sampler implementation, as the <code>HttpClient4</code> implementation does.</li>
+    <li><pr>6742</pr>Follow automatic redirects to another host in the <code>HttpClient5</code> sampler implementation, like the <code>HttpClient4</code> implementation does, instead of returning the redirect when the request carries cookies or credentials. Each redirect is sent with the cookies of the HTTP Cookie Manager and the credentials of the HTTP Authorization Manager for its own URL, the cookies the redirects set are kept in the Cookie Manager, and a <code>Cookie</code> or <code>Authorization</code> header of the HTTP Header Manager is only sent to the host of the initial URL. The number of redirects is limited by <code>httpsampler.max_redirects</code>, and cookies are only handled by the Cookie Manager, so none are sent without one.</li>
+  </ul>
 
-<h3>Listeners</h3>
-<ul>
-  <li><bug>64988</bug>Sort properties and variables in a human expected order for DebugPostProcessor and DebugSampler</li>
-  <li><bug>63061</bug>Sort View Results in Table in a human expected order</li>
-</ul>
+  <p>HTTP/2 support for the HttpClient5 sampler implementation:</p>
+  <ul>
+    <li><pr>6742</pr>Multiplex concurrent HTTP/2 requests of a thread of the HttpClient5 sampler implementation, for example the parallel downloads of embedded resources, over a single connection, and make the HTTP/2 protocol settings (HPACK header table size and compression, maximum concurrent streams, flow control window, maximum frame size, server push and h2c prior knowledge) configurable with the new <code>httpclient5.h2.*</code> properties. Pooled connections are re-validated after the period of inactivity configured with the new <code>httpclient5.validate_after_inactivity</code> property, so a connection the server closed in between two samples is replaced instead of failing the next sample.</li>
+    <li><pr>6742</pr>Add the default <code>User-Agent</code> header of the HttpClient5 sampler implementation to the request itself, so it shows up in the sample result and in the sent bytes, and allow suppressing it with the new <code>httpclient5.default_user_agent_disabled</code> property, like <code>httpclient4.default_user_agent_disabled</code> does for HttpClient4.</li>
+    <li><pr>6742</pr>Support the Kerberos mechanism of the HTTP Authorization Manager in the HttpClient5 sampler implementation. HttpClient 5 neither registers the <code>Negotiate</code> and <code>Kerberos</code> auth schemes nor prefers them by default, so they are now set up per request, and the request is executed with the JAAS subject the Authorization Manager logged the user in with. The <code>kerberos.spnego.strip_port</code>, <code>kerberos.spnego.use_canonical_host_name</code> and <code>kerberos.spnego.delegate_cred</code> properties are honoured as with HttpClient4.</li>
+    <li><pr>6742</pr>Answer a <code>Proxy-Authenticate: Negotiate</code> (SPNEGO/Kerberos) challenge of an enterprise proxy in the HttpClient5 sampler implementation, instead of failing the sample with <code>407 Proxy Authentication Required</code>. The negotiation based auth schemes are now offered to a proxy which has no user name configured, or which is covered by a Kerberos entry of the HTTP Authorization Manager, while a proxy with a configured user name keeps using the password based schemes.</li>
+    <li><pr>6742</pr>Offer only the HTTP versions the selected implementation can use in the <code>HTTP Version</code> combo box of the HTTP Request sampler and the HTTP Request Defaults: HttpClient4 and Java offer <code>HTTP/1.1</code> only, as they ignore the HTTP version, and HttpClient5 additionally offers <code>HTTP/2 Negotiate</code> and the new <code>HTTP/2 Strict</code> value, which only offers <code>h2</code> during protocol negotiation, so a server without HTTP/2 support fails the sample instead of being used with HTTP/1.1.</li>
+    <li><pr>6742</pr>Accept the legacy values <code>1.0</code> and <code>1.1</code> of the <code>httpclient.version</code> property, which now takes the HTTP versions <code>HTTP/1.1</code>, <code>HTTP/2</code> and <code>HTTP/2 Strict</code>, so an existing configuration keeps selecting HTTP/1.1 for the HttpClient5 sampler implementation. The AJP sampler still announces <code>HTTP/1.0</code> in its request line for the legacy value <code>1.0</code>, and now for <code>HTTP/1.0</code> as well.</li>
+  </ul>
 
-<h3>Timers, Assertions, Config, Pre- &amp; Post-Processors</h3>
-<ul>
-    <li><pr>638</pr>Bolt Connection Configuration: added <code>ConnectionPoolMaxSize</code> parameter. Contributed by
-        David Pecollet (david.pecollet at gmail.com)</li>
-</ul>
+  <h3>Timers, Assertions, Config, Pre- &amp; Post-Processors</h3>
+  <ul>
+    <li><issue>6448</issue>Support trailing empty default values in JSON Extractor so expressions like <code>${VAR:-}</code> are handled correctly. Contributed by Raul Almeida (github.com/ratacolita)</li>
+    <li><pr>6596</pr>Add a schema for ConstantThroughputTimer and use it to ensure required properties are initialized properly.</li>
+  </ul>
 
-<h3>Functions</h3>
-<ul>
-</ul>
+  <h3>Non-functional changes</h3>
+  <ul>
+    <li>Update Apache Tika to 4.x from 1.x to use the latest parser engine.</li>
+    <li>Update Saxon-HE to 13.x from 11.x for XSLT and XQuery processing.</li>
+    <li>Update Groovy to 5.1.3 for the Groovy-based scripting environment.</li>
+    <li>Build and test against Bouncy Castle 1.86 (not bundled; required for SMIME assertion).</li>
+    <li>Update json-path to 3.0.0 for JSON query expressions.</li>
+    <li>Update Neo4j Java driver to 6.x for Bolt-based database tests.</li>
+    <li>Update Rhino JavaScript engine to 1.9.1 for JSR-223 JavaScript execution.</li>
+    <li>Update RSyntaxTextArea to 4.0.1 (from 3.3.4) for the script and text editors.</li>
+    <li>Update Apache FreeMarker to 2.3.35 (from 2.3.32).</li>
+    <li>Update Apache Log4j to 2.26.1 (from 2.22.1).</li>
+    <li>Update jsoup to 1.23.2 (from 1.17.1).</li>
+    <li>Update Jackson to 2.22.3 (from 2.16.1).</li>
+    <li>Update dnsjava to 3.6.5 (from 2.1.9).</li>
+    <li>Update Apache Commons libraries: commons-codec 1.22.1, commons-collections4 4.6.0, commons-io 2.22.0,
+        commons-jexl3 3.7.0, commons-lang3 3.21.0, commons-logging 1.4.0, commons-net 3.13.0,
+        commons-pool2 2.13.1, commons-text 1.15.0.</li>
+    <li><pr>6742</pr>Update Apache HttpClient 5 to 5.6.4 and Apache HttpCore 5 to 5.4.3, which corrects the application of SSL parameters in the async TLS upgrade method used by the HttpClient5 sampler implementation for HTTP/2.</li>
+    <li><pr>6742</pr>Give the <code>Cache Manager</code> a single HTTP client neutral API: <code>saveDetails(CacheManager.ResponseHeaderSource, HTTPSampleResult)</code>, <code>inCache(URL, CacheManager.RequestHeaderSource)</code> and <code>setHeaders(URL, CacheManager.RequestHeaderSink)</code> replace the per implementation overloads, so the <code>Vary</code> and cache control handling exists once and the config element does not depend on a specific HTTP client library. The sampler implementations adapt their requests and responses to those interfaces. The methods taking Apache HttpClient 4 types are deprecated and delegate to the new ones.</li>
+  </ul>
 
-<h3>I18N</h3>
-<ul>
-</ul>
+  <h3>UI</h3>
+  <ul>
+    <li><pr>6333</pr>Apply HiDPI mode automatically when setting up the GUI so JMeter looks sharp on high-resolution displays. Contributed by Gabriele Coletta (github.com/gdmg92)</li>
+    <li><pr>6656</pr>Replace the previous feather icon with the new oak leaf in the JMeter logo.</li>
+  </ul>
 
-<h3>Report / Dashboard</h3>
-<ul>
-  <li><bug>65353</bug>Make the estimator used for calculating percentiles on the dashboard configurable</li>
-</ul>
+  <ch_section>Bug fixes</ch_section>
+  <h3>General</h3>
+  <ul>
+    <li><pr>6654</pr><issue>6611</issue>Support JDK 25 and above for result collectors with empty file names</li>
+    <li>Trim whitespace when parsing numeric JMeter properties so accidental spaces do not silently change configuration values.</li>
+    <li><pr>6372</pr>Fix KeyManager logging when using CLI mode so keystore passwords are not incorrectly reported as missing. Contributed by Patrick Uiterwijk (patrick at puiterwijk.org)</li>
+    <li><issue>5937</issue>Remove deprecated Log4j package scanning and configure plugin metadata processing to improve startup time and avoid deprecation warnings. Contributed by Piotr P. Karwasz (github.com/piotrgithub)</li>
+    <li><pr>6620</pr>Fix report generation paths so dashboard output files are created in the correct location after internal refactoring.</li>
+    <li><bug>6456</bug>Handle malformed percent-encoded URLs gracefully when recording HTTP traffic, logging a warning instead of failing the recording.</li>
+    <li><pr>6742</pr>Count single byte writes in <code>CountingOutputStream</code> as well, so the SMTP Sampler does not under-report the size of the messages it sends.</li>
+    <li><pr>6742</pr>Present the client certificate of the JMeter key store also on TLS connections that perform the handshake with an <code>SSLEngine</code>, like those of asynchronous HTTP clients, which the HttpClient5 sampler implementation uses for HTTP/2. So far it was only presented on socket based connections.</li>
+  </ul>
 
-<h3>General</h3>
-<ul>
-  <li><bug>61805</bug><pr>663</pr>Add simple HTTP request template. Contributed by Ori Marko (orimarko at gmail.com)</li>
-</ul>
-
-<ch_section>Non-functional changes</ch_section>
-<ul>
-  <li><bug>65128</bug><pr>643</pr>Add missing documentation about <code>Same user on each iteration</code> for Thread Groups. Contributed by njkuzas.</li>
-  <li><pr>648</pr>Updated xmlgraphics-commons to 2.6 (from 2.3). Contributed by Stefan Seide (stefan @ trilobyte.se.de)</li>
-  <li><pr>655</pr><pr>667</pr>Updated x-stream to 1.4.17 (from 1.4.15). Contributed by Stefan Seide (stefan @ trilobyte.se.de)</li>
-  <li><pr>656</pr><pr>668</pr>Updated json-smart to 2.4.7 (from 2.3), accessors-smart to 2.4.7 (from 1.2) and asm 9.1 (from 9.0). Contributed by Stefan Seide (stefan @ trilobyte.se.de)</li>
-  <li><bug>64831</bug>Log truststore entries in debug level for logger <code>org.apache.jmeter.util.keystore.JmeterKeyStore</code></li>
-  <li><bug>65232</bug>Hide splash screen when an error is displayed because the test plan could not be parsed.</li>
-  <li>Updated Groovy to 3.0.8 (from 3.0.7).</li>
-</ul>
-
- <!-- =================== Bug fixes =================== -->
-
-<ch_section>Bug fixes</ch_section>
-
-<h3>HTTP Samplers and Test Script Recorder</h3>
-<ul>
-  <li><bug>65310</bug>Don't let users override <code>multipart/form-data</code> <code>content-type</code>
-    header in HC4 sampler.</li>
-  <li><bug>65363</bug><code>NullPointerException</code> in <code>HTTPHC4Impl$ManagedCredentialsProvider.getAuthorizationForAuthScope</code> when <code>401</code> response from remote and <code>httpclient4.auth.preemptive=false</code></li>
-</ul>
-
-<h3>Other Samplers</h3>
-<ul>
-  <li><bug>65152</bug>OS Process Sampler - Cannot <code>Add from Clipboard</code> Command parameters</li>
-  <li><pr>638</pr>Bolt Sampler: fixed error displaying results when "Record Query Results" is enabled. Contributed by
-        David Pecollet (david.pecollet at gmail.com)</li>
-</ul>
-
-<h3>Controllers</h3>
-<ul>
-</ul>
-
-<h3>Listeners</h3>
-<ul>
-  <li><bug>64962</bug>Save CSV sub-results recursively from View Results Tree</li>
-</ul>
-
-<h3>Timers, Assertions, Config, Pre- &amp; Post-Processors</h3>
-<ul>
-  <li><bug>65257</bug>JMESPathExtractor writes error log entries if JMESPath filter returns empty result</li>
-  <li><bug>65259</bug>JMESPathExtractor Attribute <code>Match No.</code> Required</li>
-  <li><bug>65269</bug>JSON Extractor and JSON JMESPath Extractor ignore sub-samples</li>
-  <li><bug>65352</bug>Warning logged when Boundary Extractor doesn't find any match</li>
-</ul>
-
-<h3>Functions</h3>
-<ul>
-</ul>
-
-<h3>I18N</h3>
-<ul>
-</ul>
-
-<h3>Report / Dashboard</h3>
-<ul>
-</ul>
-
-<h3>Documentation</h3>
-<ul>
-</ul>
-
-<h3>General</h3>
-<ul>
-  <li><bug>64318</bug>DNS Cache Manager - custom DNS resolver does not use system resolver by default</li>
-  <li><pr>641</pr>Updated xercesImpl to 2.12.1 (from 2.12.0). Based on patch by Stefan Seide (stefan at trilobyte-se.de).</li>
-  <li><pr>645</pr>Add escaping for new lines in AbstractInfluxdbMetricsSender. Contributed by David Getzlaff (david.getzlaff at t-systems.com>)</li>
-  <li><bug>65198</bug>Can't copy generated function from FunctionHelper</li>
-  <li>Updated Apache Tika to 1.26 (from 1.24.1)</li>
-  <li><pr>658</pr>Improve javadoc. Contributed by Ori Marko (orimarko at gmail.com)</li>
-  <li><pr>661</pr>Fix wording in doc. Contributed by BugKing (wangzhen at fit2cloud.com)</li>
-  <li><pr>664</pr>Allow whitespace in path. Contributed by Till Neunast (github.com/tilln)</li>
-  <li><bug>65270</bug>POST application/x-www-form-urlencoded cURL code generated from Postman is not imported correctly</li>
-  <li>Silence warnings of missing font Arial on startup under linux</li>
-  <li><bug>65300</bug>IllegalAccessError when opening file dialog with Java 16</li>
-</ul>
+  <h3>HTTP Samplers and Test Script Recorder</h3>
+  <ul>
+    <li><pr>6742</pr>Keep the HTTP clients of a thread from being used, and closed, by another thread when embedded resources are downloaded in parallel. The threads which perform those downloads are pooled and shared by all threads, so they used to keep the clients of whichever thread happened to create them, which made samples fail with errors such as <code>Non HTTP response code: java.io.IOException</code>, <code>Socket closed</code> or <code>Connection pool shut down</code> as soon as that thread finished or started a new iteration. The clients are now looked up by the context of the thread the download is performed for, in the HttpClient4 and HttpClient5 sampler implementations.</li>
+  </ul>
 
  <!--  =================== Thanks =================== -->
 
@@ -212,19 +169,15 @@ Summary
 <p>We thank all contributors mentioned in bug and improvement sections above:
 </p>
 <ul>
-  <li>Stefan Seide (stefan at trilobyte-se.de)</li>
-  <li>njzukas (github.com/njzukas)</li>
-  <li>David Getzlaff (david.getzlaff at t-systems.com>)</li>
-  <li>Konstantin Kalinin (konstantin at kkalinin.pro)</li>
-  <li>David Pecollet (david.pecollet at gmail.com)</li>
-  <li>Ori Marko (orimarko at gmail.com)</li>
-  <li>BugKing (wangzhen at fit2cloud.com)</li>
-  <li>Till Neunast (github.com/tilln)</li>
-  <li>Baptiste Gaillard (baptiste.gaillard at gmail.com)</li>
+  <li>Raul Almeida (github.com/ratacolita)</li>
+  <li>Pasquale Pochop (github.com/pochopsp)</li>
+  <li>Gabriele Coletta (github.com/gdmg92)</li>
+  <li>Patrick Uiterwijk (patrick at puiterwijk.org)</li>
+  <li>Piotr P. Karwasz (github.com/piotrgithub)</li>
+  <li>Andreas Lind (github.com/andreaslind01)</li>
 </ul>
 <p>We also thank bug reporters who helped us improve JMeter.</p>
 <ul>
-  <li>Nikola Aleksic (nalexic at gmail.com)</li>
 </ul>
 <p>
 Apologies if we have omitted anyone else.
@@ -267,60 +220,24 @@ See  <bugzilla>56357</bugzilla> for details.
 </li>
 
 <li>
-Under Mac OSX Aggregate Graph will show wrong values due to mirroring effect on numbers.
-This is due to a known Java bug, see Bug <a href="https://bugs.openjdk.java.net/browse/JDK-8065373" >JDK-8065373</a>
-The fix is to use JDK8_u45 or later.
-</li>
-
-<li>
-View Results Tree may fail to display some HTML code under HTML renderer, see <bugzilla>54586</bugzilla>.
-This is due to a known Java bug which fails to parse "<code>px</code>" units in row/col attributes.
-See Bug <a href="https://bugs.openjdk.java.net/browse/JDK-8031109" >JDK-8031109</a>
-The fix is to use JDK9 b65 or later.
-</li>
-
-<li>
-JTable selection with keyboard (<keycombo><keysym>SHIFT</keysym><keysym>up/down</keysym></keycombo>) is totally unusable with Java 7 on Mac OSX.
-This is due to a known Java bug <a href="https://bugs.openjdk.java.net/browse/JDK-8025126" >JDK-8025126</a>
-The fix is to use JDK 8 b132 or later.
-</li>
-
-<li>
-Since Java 11 the JavaScript implementation <a href="https://openjdk.java.net/jeps/335">Nashorn has been deprecated</a>.
-Java will emit the following deprecation warnings, if you are using JavaScript based on Nashorn.
-<source>
-Warning: Nashorn engine is planned to be removed from a future JDK release
-</source>
-To silence these warnings, add <code>-Dnashorn.args=--no-deprecation-warning</code> to your Java arguments.
-That can be achieved by setting the enviroment variable <code>JVM_ARGS</code>
-<source>
-export JVM_ARGS="-Dnashorn.args=--no-deprecation-warning"
-</source>
-</li>
-
-<li>
-With Java 15 the JavaScript implementation <a href="https://openjdk.java.net/jeps/372">Nashorn has been removed</a>. To add back a JSR-223 compatible JavaScript engine you have two options:
-  <dl>
-    <dt>Use Mozilla Rhino</dt>
-    <dd>Copy <a href="https://github.com/mozilla/rhino/releases/download/Rhino1_7_13_Release/rhino-engine-1.7.13.jar">rhino-engine-1.7.13.jar</a> into <code>$JMETER_HOME/lib/ext</code>.</dd>
-    <dt>Use OpenJDK Nashorn</dt>
-    <dd>
-      The OpenJDK Nashorn implementation comes as a module. To use it, you will have to download it and add it to the module path. A hacky way to download the version 15.0 and its dependencies and set the module path is outlined below:
-      <source>
+With Java 15 the JavaScript implementation <a href="https://openjdk.java.net/jeps/372">Nashorn has been removed</a>.
+JMeter now ships with a JSR-223 compatible JavaScript engine by default (Mozilla Rhino 1.8.0),
+so you do not need to download Rhino separately anymore.<br></br>
+If you prefer to use Nashorn instead, you can still add it as a module. One way to download
+version 15.7 (or later) and its dependencies and set the module path is outlined below:
+  <source>
 mkdir lib/modules
 pushd lib/modules
-wget https://repo1.maven.org/maven2/org/openjdk/nashorn/nashorn-core/15.0/nashorn-core-15.0.jar
-wget https://repo1.maven.org/maven2/org/ow2/asm/asm/9.0/asm-9.0.jar
-wget https://repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.0/asm-commons-9.0.jar
-wget https://repo1.maven.org/maven2/org/ow2/asm/asm-util/9.0/asm-util-9.0.jar
-wget https://repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.0/asm-tree-9.0.jar
-wget https://repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.0/asm-analysis-9.0.jar
+wget https://repo1.maven.org/maven2/org/openjdk/nashorn/nashorn-core/15.7/nashorn-core-15.7.jar
+wget https://repo1.maven.org/maven2/org/ow2/asm/asm/9.9.1/asm-9.9.1.jar
+wget https://repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.9.1/asm-commons-9.9.1.jar
+wget https://repo1.maven.org/maven2/org/ow2/asm/asm-util/9.9.1/asm-util-9.9.1.jar
+wget https://repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.9.1/asm-tree-9.9.1.jar
+wget https://repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.9.1/asm-analysis-9.9.1.jar
 popd
-export JVM_ARGS="--modulepath $PWD/lib/modules"
+export JVM_ARGS="--module-path $PWD/lib/modules"
 ./bin/jmeter
-      </source>
-    </dd>
-  </dl>
+  </source>
 </li>
 
 </ul>

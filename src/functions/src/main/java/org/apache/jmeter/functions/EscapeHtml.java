@@ -21,11 +21,13 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import org.apache.commons.text.StringEscapeUtils;
 import org.apache.jmeter.engine.util.CompoundVariable;
 import org.apache.jmeter.samplers.SampleResult;
 import org.apache.jmeter.samplers.Sampler;
 import org.apache.jmeter.util.JMeterUtils;
+import org.unbescape.html.HtmlEscape;
+
+import com.google.auto.service.AutoService;
 
 /**
  * <p>Function which escapes the characters in a <code>String</code> using HTML entities.</p>
@@ -39,13 +41,14 @@ import org.apache.jmeter.util.JMeterUtils;
  * <code>&amp;quot;bread&amp;quot; &amp;amp; &amp;quot;butter&amp;quot;</code>.
  * </p>
  *
- * <p>Supports all known HTML 4.0 entities.
+ * <p>Supports all known HTML 5.0 entities.
  * Note that the commonly used apostrophe escape character (&amp;apos;)
  * is not a legal entity and so is not supported). </p>
  *
- * @see StringEscapeUtils#escapeHtml4(String) (Commons Lang)
+ * @see HtmlEscape#escapeHtml5(String)
  * @since 2.3.3
  */
+@AutoService(Function.class)
 public class EscapeHtml extends AbstractFunction {
 
     private static final List<String> desc = new ArrayList<>();
@@ -67,7 +70,7 @@ public class EscapeHtml extends AbstractFunction {
             throws InvalidVariableException {
 
         String rawString = ((CompoundVariable) values[0]).execute();
-        return StringEscapeUtils.escapeHtml4(rawString);
+        return HtmlEscape.escapeHtml5(rawString);
 
     }
 

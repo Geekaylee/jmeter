@@ -25,7 +25,6 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
-import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -36,6 +35,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -61,9 +61,6 @@ import javax.swing.tree.TreeNode;
 import javax.swing.tree.TreePath;
 import javax.swing.tree.TreeSelectionModel;
 
-import org.apache.commons.collections4.EnumerationUtils;
-import org.apache.commons.collections4.queue.CircularFifoQueue;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.JMeter;
 import org.apache.jmeter.assertions.AssertionResult;
 import org.apache.jmeter.gui.GUIMenuSortOrder;
@@ -74,6 +71,10 @@ import org.apache.jmeter.samplers.SampleResult;
 import org.apache.jmeter.util.JMeterUtils;
 import org.apache.jmeter.visualizers.gui.AbstractVisualizer;
 import org.apache.jorphan.gui.JMeterUIDefaults;
+import org.apache.jorphan.reflect.LogAndIgnoreServiceLoadExceptionHandler;
+import org.apache.jorphan.util.StringUtilities;
+import org.apache.jorphan.util.StringWrap;
+import org.apiguardian.api.API;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -103,6 +104,14 @@ implements ActionListener, TreeSelectionListener, Clearable, ItemListener {
     private static final int MAX_DISPLAY_SIZE =
             JMeterUtils.getPropDefault("view.results.tree.max_size", 10485760); // $NON-NLS-1$
 
+    // Default limited to 110K
+    private static final int MAX_LINE_SIZE =
+            JMeterUtils.getPropDefault("view.results.tree.max_line_size", 110000); // $NON-NLS-1$
+
+    // Limit the soft wrap to 100K (hard limit divided by 1.1)
+    private static final int SOFT_WRAP_LINE_SIZE =
+            JMeterUtils.getPropDefault("view.results.tree.soft_wrap_line_size", (int) (MAX_LINE_SIZE / 1.1f)); // $NON-NLS-1$
+
     // default display order
     private static final String VIEWERS_ORDER =
             JMeterUtils.getPropDefault("view.results.tree.renderers_order", ""); // $NON-NLS-1$ //$NON-NLS-2$
@@ -129,7 +138,8 @@ implements ActionListener, TreeSelectionListener, Clearable, ItemListener {
     private Object resultsObject = null;
     private TreeSelectionEvent lastSelectionEvent;
     private JCheckBox autoScrollCB;
-    private final Queue<SampleResult> buffer;
+    private final Queue<SampleResult> buffer = new ArrayDeque<>();
+    private final int maxResults;
     private boolean dataChanged;
 
     /**
@@ -137,12 +147,7 @@ implements ActionListener, TreeSelectionListener, Clearable, ItemListener {
      */
     public ViewResultsFullVisualizer() {
         super();
-        final int maxResults = JMeterUtils.getPropDefault("view.results.tree.max_results", 500);
-        if (maxResults > 0) {
-            buffer = new CircularFifoQueue<>(maxResults);
-        } else {
-            buffer = new ArrayDeque<>();
-        }
+        this.maxResults = JMeterUtils.getPropDefault("view.results.tree.max_results", 500);
         init();
         new Timer(REFRESH_PERIOD, e -> updateGui()).start();
     }
@@ -151,6 +156,9 @@ implements ActionListener, TreeSelectionListener, Clearable, ItemListener {
     @Override
     public void add(final SampleResult sample) {
         synchronized (buffer) {
+            if (maxResults > 0 && buffer.size() >= maxResults) {
+                buffer.remove();
+            }
             buffer.add(sample);
             dataChanged = true;
         }
@@ -224,9 +232,9 @@ implements ActionListener, TreeSelectionListener, Clearable, ItemListener {
         return oldSelectedElement;
     }
 
-    private TreePath checkExpandedOrSelected(List<TreeNode> path,
+    private static TreePath checkExpandedOrSelected(List<TreeNode> path,
             Object item, Object oldSelectedObject,
-            Set<Object> oldExpandedObjects, Set<TreePath> newExpandedPaths,
+            Set<Object> oldExpandedObjects, Set<? super TreePath> newExpandedPaths,
             TreePath defaultPath) {
         TreePath result = defaultPath;
         if (oldSelectedObject == item) {
@@ -238,9 +246,9 @@ implements ActionListener, TreeSelectionListener, Clearable, ItemListener {
         return result;
     }
 
-    private TreePath checkExpandedOrSelected(List<TreeNode> path,
+    private static TreePath checkExpandedOrSelected(List<TreeNode> path,
             Object item, Object oldSelectedObject,
-            Set<Object> oldExpandedObjects, Set<TreePath> newExpandedPaths,
+            Set<Object> oldExpandedObjects, Set<? super TreePath> newExpandedPaths,
             TreePath defaultPath, DefaultMutableTreeNode extensionNode) {
         TreePath result = defaultPath;
         if (oldSelectedObject == item) {
@@ -252,9 +260,9 @@ implements ActionListener, TreeSelectionListener, Clearable, ItemListener {
         return result;
     }
 
-    private Set<Object> extractExpandedObjects(final Enumeration<TreePath> expandedElements) {
+    private static Set<Object> extractExpandedObjects(final Enumeration<TreePath> expandedElements) {
         if (expandedElements != null) {
-            final List<TreePath> list = EnumerationUtils.toList(expandedElements);
+            final List<TreePath> list = Collections.list(expandedElements);
             log.debug("Expanded: {}", list);
             Set<Object> result = list.stream()
                     .map(TreePath::getLastPathComponent)
@@ -269,7 +277,7 @@ implements ActionListener, TreeSelectionListener, Clearable, ItemListener {
 
     private TreePath addSubResults(DefaultMutableTreeNode currNode,
             SampleResult res, List<TreeNode> path, Object selectedObject,
-            Set<Object> oldExpandedObjects, Set<TreePath> newExpandedPaths) {
+            Set<Object> oldExpandedObjects, Set<? super TreePath> newExpandedPaths) {
         SampleResult[] subResults = res.getSubResults();
 
         int leafIndex = 0;
@@ -300,11 +308,11 @@ implements ActionListener, TreeSelectionListener, Clearable, ItemListener {
         return result;
     }
 
-    private TreePath toTreePath(List<TreeNode> newPath) {
+    private static TreePath toTreePath(List<TreeNode> newPath) {
         return new TreePath(newPath.toArray(new TreeNode[newPath.size()]));
     }
 
-    private TreePath toTreePath(List<TreeNode> path,
+    private static TreePath toTreePath(List<TreeNode> path,
             DefaultMutableTreeNode extensionNode) {
         TreeNode[] result = path.toArray(new TreeNode[path.size() + 1]);
         result[result.length - 1] = extensionNode;
@@ -384,8 +392,7 @@ implements ActionListener, TreeSelectionListener, Clearable, ItemListener {
             resultsRender.setSamplerResult(userObject);
             resultsRender.setupTabPane(); // Processes Assertions
             // display a SampleResult
-            if (userObject instanceof SampleResult) {
-                SampleResult sampleResult = (SampleResult) userObject;
+            if (userObject instanceof SampleResult sampleResult) {
                 if (isTextDataType(sampleResult)){
                     resultsRender.renderResult(sampleResult);
                 } else {
@@ -403,8 +410,9 @@ implements ActionListener, TreeSelectionListener, Clearable, ItemListener {
      * @return true if sampleResult is text or has empty content type
      */
     protected static boolean isTextDataType(SampleResult sampleResult) {
-        return SampleResult.TEXT.equals(sampleResult.getDataType())
-                || StringUtils.isEmpty(sampleResult.getDataType());
+        String dataType = sampleResult.getDataType();
+        return SampleResult.TEXT.equals(dataType) ||
+                StringUtilities.isEmpty(dataType);
     }
 
     private synchronized Component createLeftPanel() {
@@ -445,42 +453,28 @@ implements ActionListener, TreeSelectionListener, Clearable, ItemListener {
         selectRenderPanel.addActionListener(this);
 
         // if no results render in jmeter.properties, load Standard (default)
-        List<String> classesToAdd = Collections.<String>emptyList();
-        try {
-            classesToAdd = JMeterUtils.findClassesThatExtend(ResultRenderer.class);
-        } catch (IOException e1) {
-            // ignored
-        }
         String defaultRenderer = expandToClassname(".RenderAsText"); // $NON-NLS-1$
-        if (VIEWERS_ORDER.length() > 0) {
+        if (!VIEWERS_ORDER.isEmpty()) {
             defaultRenderer = expandToClassname(VIEWERS_ORDER.split(",", 2)[0]);
         }
-        Object defaultObject = null;
-        Map<String, ResultRenderer> map = new HashMap<>(classesToAdd.size());
-        for (String clazz : classesToAdd) {
-            try {
-                // Instantiate render classes
-                final ResultRenderer renderer = Class.forName(clazz)
-                        .asSubclass(ResultRenderer.class)
-                        .getDeclaredConstructor().newInstance();
-                if (defaultRenderer.equals(clazz)) {
-                    defaultObject=renderer;
-                }
-                renderer.setBackgroundColor(getBackground());
-                map.put(renderer.getClass().getName(), renderer);
-            } catch (NoClassDefFoundError e) { // NOSONAR See bug 60583
-                if (e.getMessage() != null && e.getMessage().contains("javafx")) {
-                    log.info("Add JavaFX to your Java installation if you want to use renderer: {}", clazz);
-                } else {
-                    log.warn("Error loading result renderer: {}", clazz, e);
-                }
-            } catch (Exception e) {
-                log.warn("Error loading result renderer: {}", clazz, e);
+        ResultRenderer defaultObject = null;
+        Map<String, ResultRenderer> map = new HashMap<>();
+        for (ResultRenderer renderer : JMeterUtils.loadServicesAndScanJars(
+                ResultRenderer.class,
+                ServiceLoader.load(ResultRenderer.class),
+                Thread.currentThread().getContextClassLoader(),
+                new LogAndIgnoreServiceLoadExceptionHandler(log)
+        )) {
+            // Instantiate render classes
+            if (defaultRenderer.equals(renderer.getClass().getName())) {
+                defaultObject = renderer;
             }
+            renderer.setBackgroundColor(getBackground());
+            map.put(renderer.getClass().getName(), renderer);
         }
-        if (VIEWERS_ORDER.length() > 0) {
+        if (!VIEWERS_ORDER.isEmpty()) {
             Arrays.stream(VIEWERS_ORDER.split(","))
-                    .map(this::expandToClassname)
+                    .map(ViewResultsFullVisualizer::expandToClassname)
                     .forEach(key -> {
                         ResultRenderer renderer = map.remove(key);
                         if (renderer != null) {
@@ -499,7 +493,7 @@ implements ActionListener, TreeSelectionListener, Clearable, ItemListener {
         return selectRenderPanel;
     }
 
-    private String expandToClassname(String name) {
+    private static String expandToClassname(String name) {
         if (name.startsWith(".")) {
             return "org.apache.jmeter.visualizers" + name; // $NON-NLS-1$
         }
@@ -550,18 +544,33 @@ implements ActionListener, TreeSelectionListener, Clearable, ItemListener {
             // they are ready to wait.
             int len = res.getResponseDataAsString().length();
             if (MAX_DISPLAY_SIZE > 0 && len > MAX_DISPLAY_SIZE) {
-                StringBuilder builder = new StringBuilder(MAX_DISPLAY_SIZE + 100);
-                builder.append(JMeterUtils.getResString("view_results_response_too_large_message")) //$NON-NLS-1$
-                    .append(len).append(" > Max: ").append(MAX_DISPLAY_SIZE)
-                    .append(", ").append(JMeterUtils.getResString("view_results_response_partial_message")) // $NON-NLS-1$
-                    .append("\n").append(res.getResponseDataAsString(), 0, MAX_DISPLAY_SIZE).append("\n...");
-                response = builder.toString();
+                response = """
+                        %s%d > Max: %d, %s
+                        %s
+                        ...""".formatted(
+                            JMeterUtils.getResString("view_results_response_too_large_message"), //$NON-NLS-1$
+                            len, MAX_DISPLAY_SIZE,
+                            JMeterUtils.getResString("view_results_response_partial_message"), // $NON-NLS-1$
+                            res.getResponseDataAsString().substring(0, MAX_DISPLAY_SIZE));
             } else {
                 response = res.getResponseDataAsString();
             }
         }
         return response;
     }
+
+    @API(status = API.Status.INTERNAL, since = "5.5")
+    public static String wrapLongLines(String input) {
+        if (StringUtilities.isEmpty(input)) {
+            return input;
+        }
+        if (SOFT_WRAP_LINE_SIZE > 0 && MAX_LINE_SIZE > 0) {
+            StringWrap stringWrap = new StringWrap(SOFT_WRAP_LINE_SIZE, MAX_LINE_SIZE);
+            return stringWrap.wrap(input, "\n");
+        }
+        return input;
+    }
+
 
     private static class ResultsNodeRenderer extends DefaultTreeCellRenderer {
         private static final long serialVersionUID = 4159626601097711565L;
@@ -572,10 +581,9 @@ implements ActionListener, TreeSelectionListener, Clearable, ItemListener {
             super.getTreeCellRendererComponent(tree, value, sel, expanded, leaf, row, focus);
             boolean failure = true;
             Object userObject = ((DefaultMutableTreeNode) value).getUserObject();
-            if (userObject instanceof SampleResult) {
-                failure = !((SampleResult) userObject).isSuccessful();
-            } else if (userObject instanceof AssertionResult) {
-                AssertionResult assertion = (AssertionResult) userObject;
+            if (userObject instanceof SampleResult sampleResult) {
+                failure = !sampleResult.isSuccessful();
+            } else if (userObject instanceof AssertionResult assertion) {
                 failure = assertion.isError() || assertion.isFailure();
             }
 

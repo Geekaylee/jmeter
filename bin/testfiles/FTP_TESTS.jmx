@@ -76,18 +76,21 @@ import org.apache.ftpserver.usermanager.impl.BaseUser;
 import org.apache.ftpserver.usermanager.impl.WritePermission;
 import org.apache.jmeter.util.JMeterUtils;
 import org.apache.ftpserver.ftplet.Authority;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.ArrayList;
-import org.apache.commons.io.FileUtils;
 import org.apache.ftpserver.DataConnectionConfiguration;
 import org.apache.ftpserver.DataConnectionConfigurationFactory;
+import kotlin.io.path.PathsKt;
 
-FileUtils.deleteDirectory(new File(JMeterUtils.getJMeterHome(), &quot;bin/ftp_test&quot;));
-new File(JMeterUtils.getJMeterHome(), &quot;bin/ftp_test&quot;).mkdir();
+Path ftpTestPath = Path.of(JMeterUtils.getJMeterHome(), &quot;bin/temp/ftp_test&quot;);
+PathsKt.deleteRecursively(ftpTestPath);
+Files.createDirectories(ftpTestPath);
 
-DataConnectionConfigurationFactory dataConnectionConfigurationFactory = 
+DataConnectionConfigurationFactory dataConnectionConfigurationFactory =
 	new DataConnectionConfigurationFactory();
-dataConnectionConfigurationFactory.setPassivePorts(vars.get(&quot;passivePort&quot;));	
+dataConnectionConfigurationFactory.setPassivePorts(vars.get(&quot;passivePort&quot;));
 DataConnectionConfiguration dataConnectionConfiguration = dataConnectionConfigurationFactory.createDataConnectionConfiguration();
 
 PropertiesUserManagerFactory userManagerFactory = new PropertiesUserManagerFactory();
@@ -107,7 +110,7 @@ listenerFactory.setPort(Integer.parseInt(vars.get(&quot;port&quot;)));
 FtpServerFactory factory = new FtpServerFactory();
 factory.setUserManager(userManager);
 factory.addListener(&quot;default&quot;, listenerFactory.createListener());
- 
+
 FtpServer server = factory.createServer();
 server.start();
 
@@ -145,7 +148,7 @@ props.put(&quot;FTP_SERVER&quot;, server);
           <stringProp name="FTPSampler.server"></stringProp>
           <stringProp name="FTPSampler.port"></stringProp>
           <stringProp name="FTPSampler.filename">jmeter.properties</stringProp>
-          <stringProp name="FTPSampler.localfilename">ftp_test/jmeter-from-ftp-binary.properties</stringProp>
+          <stringProp name="FTPSampler.localfilename">temp/ftp_test/jmeter-from-ftp-binary.properties</stringProp>
           <stringProp name="FTPSampler.inputdata"></stringProp>
           <boolProp name="FTPSampler.binarymode">true</boolProp>
           <boolProp name="FTPSampler.saveresponse">true</boolProp>
@@ -168,7 +171,7 @@ props.put(&quot;FTP_SERVER&quot;, server);
           <stringProp name="FTPSampler.server"></stringProp>
           <stringProp name="FTPSampler.port"></stringProp>
           <stringProp name="FTPSampler.filename">jmeter.properties</stringProp>
-          <stringProp name="FTPSampler.localfilename">ftp_test/jmeter-from-ftp-ascii.properties</stringProp>
+          <stringProp name="FTPSampler.localfilename">temp/ftp_test/jmeter-from-ftp-ascii.properties</stringProp>
           <stringProp name="FTPSampler.inputdata"></stringProp>
           <boolProp name="FTPSampler.binarymode">false</boolProp>
           <boolProp name="FTPSampler.saveresponse">true</boolProp>
@@ -190,8 +193,8 @@ props.put(&quot;FTP_SERVER&quot;, server);
         <FTPSampler guiclass="FtpTestSamplerGui" testclass="FTPSampler" testname="FTP Request-put-text" enabled="true">
           <stringProp name="FTPSampler.server"></stringProp>
           <stringProp name="FTPSampler.port"></stringProp>
-          <stringProp name="FTPSampler.filename">ftp_test/jmeter-from-ftp-ascii-write.properties</stringProp>
-          <stringProp name="FTPSampler.localfilename">ftp_test/jmeter-from-ftp-ascii.properties</stringProp>
+          <stringProp name="FTPSampler.filename">temp/ftp_test/jmeter-from-ftp-ascii-write.properties</stringProp>
+          <stringProp name="FTPSampler.localfilename">temp/ftp_test/jmeter-from-ftp-ascii.properties</stringProp>
           <stringProp name="FTPSampler.inputdata"></stringProp>
           <boolProp name="FTPSampler.binarymode">false</boolProp>
           <boolProp name="FTPSampler.saveresponse">true</boolProp>
@@ -203,8 +206,8 @@ props.put(&quot;FTP_SERVER&quot;, server);
         <FTPSampler guiclass="FtpTestSamplerGui" testclass="FTPSampler" testname="FTP Request-check-upload" enabled="true">
           <stringProp name="FTPSampler.server"></stringProp>
           <stringProp name="FTPSampler.port"></stringProp>
-          <stringProp name="FTPSampler.filename">ftp_test/jmeter-from-ftp-ascii-write.properties</stringProp>
-          <stringProp name="FTPSampler.localfilename">ftp_test/jmeter-from-ftp-ascii-write-tocheck.properties</stringProp>
+          <stringProp name="FTPSampler.filename">temp/ftp_test/jmeter-from-ftp-ascii-write.properties</stringProp>
+          <stringProp name="FTPSampler.localfilename">temp/ftp_test/jmeter-from-ftp-ascii-write-tocheck.properties</stringProp>
           <stringProp name="FTPSampler.inputdata"></stringProp>
           <boolProp name="FTPSampler.binarymode">false</boolProp>
           <boolProp name="FTPSampler.saveresponse">true</boolProp>
@@ -244,11 +247,11 @@ props.put(&quot;FTP_SERVER&quot;, server);
           <stringProp name="cacheKey">d09f6f8d-0f86-4cae-b88c-0ad9bd587d31</stringProp>
           <stringProp name="script">import org.apache.ftpserver.FtpServer;
 import org.apache.jmeter.util.JMeterUtils;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.FileUtils;
+import java.nio.file.Path;
+import kotlin.io.path.PathsKt;
 
-
-FileUtils.deleteDirectory(new File(JMeterUtils.getJMeterHome(), &quot;bin/ftp_test&quot;));
+Path ftpTestPath = Path.of(JMeterUtils.getJMeterHome(), &quot;bin/temp/ftp_test&quot;);
+PathsKt.deleteRecursively(ftpTestPath);
 
 FtpServer server = (FtpServer) props.get(&quot;FTP_SERVER&quot;);
 try {

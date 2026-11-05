@@ -19,11 +19,13 @@ package org.apache.jmeter.functions;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.jmeter.engine.util.CompoundVariable;
 import org.apache.jmeter.samplers.SampleResult;
 import org.apache.jmeter.samplers.Sampler;
@@ -31,6 +33,8 @@ import org.apache.jmeter.threads.JMeterVariables;
 import org.apache.jmeter.util.JMeterUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.auto.service.AutoService;
 
 /**
  * FileToString Function to read a complete file into a String.
@@ -50,6 +54,7 @@ import org.slf4j.LoggerFactory;
  * </ul>
  * @since 2.4
  */
+@AutoService(Function.class)
 public class FileToString extends AbstractFunction {
     private static final Logger log = LoggerFactory.getLogger(FileToString.class);
 
@@ -101,9 +106,9 @@ public class FileToString extends AbstractFunction {
         String myValue = ERR_IND;
 
         try {
-            File file = new File(fileName);
-            if(file.exists() && file.canRead()) {
-                myValue = FileUtils.readFileToString(new File(fileName), encoding);
+            Path path = Path.of(fileName);
+            if (Files.exists(path) && Files.isReadable(path)) {
+                myValue = Files.readString(path, encoding == null ? Charset.defaultCharset() : Charset.forName(encoding));
             } else {
                 log.warn("Could not read open: {} ", fileName);
             }
@@ -111,7 +116,7 @@ public class FileToString extends AbstractFunction {
             log.warn("Could not read file: {} {}", fileName, e.getMessage(), e);
         }
 
-        if (myName.length() > 0) {
+        if (!myName.isEmpty()) {
             JMeterVariables vars = getVariables();
             if (vars != null) {// Can be null if called from Config item testEnded() method
                 vars.put(myName, myValue);

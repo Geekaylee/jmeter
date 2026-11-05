@@ -77,25 +77,16 @@ public class TestCacheManagerHC4 extends TestCacheManagerBase {
             }
         }
 
-        /* (non-Javadoc)
-         * @see org.apache.http.message.AbstractHttpMessage#getAllHeaders()
-         */
         @Override
         public org.apache.http.Header[] getAllHeaders() {
             return headers.toArray(new org.apache.http.Header[headers.size()]);
         }
 
-        /* (non-Javadoc)
-         * @see org.apache.http.message.AbstractHttpMessage#addHeader(org.apache.http.Header)
-         */
         @Override
         public void addHeader(org.apache.http.Header header) {
             headers.add(header);
         }
 
-        /* (non-Javadoc)
-         * @see org.apache.http.message.AbstractHttpMessage#getFirstHeader(java.lang.String)
-         */
         @Override
         public Header getFirstHeader(String headerName) {
             Header[] headers = getHeaders(headerName);
@@ -105,9 +96,6 @@ public class TestCacheManagerHC4 extends TestCacheManagerBase {
             return null;
         }
 
-        /* (non-Javadoc)
-         * @see org.apache.http.message.AbstractHttpMessage#getLastHeader(java.lang.String)
-         */
         @Override
         public Header getLastHeader(String headerName) {
             Header[] headers = getHeaders(headerName);
@@ -117,9 +105,6 @@ public class TestCacheManagerHC4 extends TestCacheManagerBase {
             return null;
         }
 
-        /* (non-Javadoc)
-         * @see org.apache.http.message.AbstractHttpMessage#getHeaders(java.lang.String)
-         */
         @Override
         public Header[] getHeaders(String headerName) {
             org.apache.http.Header header = null;
@@ -249,6 +234,7 @@ public class TestCacheManagerHC4 extends TestCacheManagerBase {
     }
 
     @Override
+    @SuppressWarnings("deprecation")
     protected void cacheResult(HTTPSampleResult result, boolean hasCachingHeaders) {
         if (hasCachingHeaders) {
             this.cacheManager.saveDetails(httpResponse, result);
@@ -263,6 +249,7 @@ public class TestCacheManagerHC4 extends TestCacheManagerBase {
     }
 
     @Override
+    @SuppressWarnings("deprecation")
     protected void setRequestHeaders() {
         this.cacheManager.setHeaders(this.url, this.httpMethod);
     }

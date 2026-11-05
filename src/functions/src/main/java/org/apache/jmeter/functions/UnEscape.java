@@ -22,20 +22,23 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import org.apache.commons.text.StringEscapeUtils;
 import org.apache.jmeter.engine.util.CompoundVariable;
 import org.apache.jmeter.samplers.SampleResult;
 import org.apache.jmeter.samplers.Sampler;
 import org.apache.jmeter.util.JMeterUtils;
+import org.unbescape.java.JavaEscape;
+
+import com.google.auto.service.AutoService;
 
 /**
  * Function to unescape any Java literals found in the String.
  * For example, it will turn a sequence of '\' and 'n' into a newline character,
  * unless the '\' is preceded by another '\'.
  *
- * @see StringEscapeUtils#unescapeJava(String)
+ * @see JavaEscape#unescapeJava(String)
  * @since 2.3.3
  */
+@AutoService(Function.class)
 public class UnEscape extends AbstractFunction {
 
     private static final List<String> desc = new ArrayList<>();
@@ -57,7 +60,7 @@ public class UnEscape extends AbstractFunction {
             throws InvalidVariableException {
 
         String rawString = ((CompoundVariable) values[0]).execute();
-        return StringEscapeUtils.unescapeJava(rawString);
+        return JavaEscape.unescapeJava(rawString);
 
     }
 

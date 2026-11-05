@@ -15,25 +15,18 @@
  * limitations under the License.
  */
 
+plugins {
+    id("build-logic.jvm-published-library")
+}
+
 dependencies {
-    api(project(":src:components"))
-    testImplementation(project(":src:core", "testClasses"))
+    api(projects.src.components)
+    testImplementation(testFixtures(projects.src.core))
 
     implementation("org.mozilla:rhino")
-    implementation("commons-codec:commons-codec")
     implementation("org.apache.commons:commons-jexl")
     implementation("org.apache.commons:commons-jexl3")
-    implementation("org.apache.commons:commons-lang3") {
-        because("StringUtils")
-    }
-    implementation("commons-io:commons-io") {
-        because("FileUtils")
-    }
-    implementation("org.apache.commons:commons-text") {
-        because("StringEscapeUtils")
-    }
+    implementation("org.unbescape:unbescape")
     implementation("com.github.ben-manes.caffeine:caffeine")
     implementation("oro:oro")
-    testImplementation("org.hamcrest:hamcrest-core")
-    testImplementation("org.exparity:hamcrest-date")
 }

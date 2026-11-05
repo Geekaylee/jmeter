@@ -22,14 +22,16 @@ import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.engine.util.CompoundVariable;
 import org.apache.jmeter.samplers.SampleResult;
 import org.apache.jmeter.samplers.Sampler;
 import org.apache.jmeter.threads.JMeterVariables;
 import org.apache.jmeter.util.JMeterUtils;
+import org.apache.jorphan.util.StringUtilities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.auto.service.AutoService;
 
 /**
  * Provides a RandomFromMultipleVars function which returns a random element from a multi valued extracted variable.
@@ -41,6 +43,7 @@ import org.slf4j.LoggerFactory;
  *
  * @since 3.1
  */
+@AutoService(Function.class)
 public class RandomFromMultipleVars extends AbstractFunction {
     private static final Logger log = LoggerFactory.getLogger(RandomFromMultipleVars.class);
 
@@ -75,7 +78,7 @@ public class RandomFromMultipleVars extends AbstractFunction {
             List<String> results = new ArrayList<>();
             String[] variables = variablesNamesSplitBySeparatorValue.split(SEPARATOR);
             for (String currentVarName : variables) {
-                if(!StringUtils.isEmpty(currentVarName)) {
+                if (StringUtilities.isNotEmpty(currentVarName)) {
                     extractVariableValuesToList(currentVarName, vars, results);
                 }
             }
@@ -108,11 +111,11 @@ public class RandomFromMultipleVars extends AbstractFunction {
      * @param vars {@link JMeterVariables}
      * @param results {@link List} where results are stored
      */
-    private void extractVariableValuesToList(String variableName,
-            JMeterVariables vars, List<String> results) {
+    private static void extractVariableValuesToList(String variableName,
+            JMeterVariables vars, List<? super String> results) {
         String matchNumberAsStr = vars.get(variableName+"_matchNr");
         int matchNumber = 0;
-        if(!StringUtils.isEmpty(matchNumberAsStr)) {
+        if (StringUtilities.isNotEmpty(matchNumberAsStr)) {
             matchNumber = Integer.parseInt(matchNumberAsStr);
         }
         if(matchNumber > 0) {
@@ -121,7 +124,7 @@ public class RandomFromMultipleVars extends AbstractFunction {
             }
         } else {
             String value = vars.get(variableName);
-            if(!StringUtils.isEmpty(value)) {
+            if (StringUtilities.isNotEmpty(value)) {
                 results.add(value);
             }
         }

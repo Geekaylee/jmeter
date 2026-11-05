@@ -34,7 +34,7 @@ import org.apache.jmeter.util.JMeterUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.github.weisj.darklaf.icons.ThemedSVGIcon;
+import com.github.weisj.darklaf.properties.icons.ThemedSVGIcon;
 
 /**
  * Splash Screen
@@ -109,6 +109,10 @@ public class SplashScreen extends JDialog {
      * @param progress Loading progress
      */
     public void setProgress(final int progress) {
-        SwingUtilities.invokeLater(() -> progressBar.setValue(progress));
+        if (SwingUtilities.isEventDispatchThread()) {
+            progressBar.setValue(progress);
+        } else {
+            SwingUtilities.invokeLater(() -> progressBar.setValue(progress));
+        }
     }
 }

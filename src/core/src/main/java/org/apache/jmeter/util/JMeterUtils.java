@@ -31,15 +31,21 @@ import java.net.InetAddress;
 import java.net.URL;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Enumeration;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.MissingResourceException;
 import java.util.Properties;
 import java.util.ResourceBundle;
+import java.util.ServiceLoader;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
@@ -53,13 +59,16 @@ import javax.swing.JTextArea;
 import javax.swing.SwingUtilities;
 
 import org.apache.jmeter.gui.GuiPackage;
+import org.apache.jmeter.save.JMeterStaxDriver;
 import org.apache.jmeter.threads.JMeterContextService;
 import org.apache.jorphan.gui.JFactory;
 import org.apache.jorphan.gui.JMeterUIDefaults;
 import org.apache.jorphan.reflect.ClassFinder;
+import org.apache.jorphan.reflect.ServiceLoadExceptionHandler;
 import org.apache.jorphan.test.UnitTestManager;
 import org.apache.jorphan.util.JMeterError;
 import org.apache.jorphan.util.JOrphanUtils;
+import org.apache.jorphan.util.StringUtilities;
 import org.apache.oro.text.MalformedCachePatternException;
 import org.apache.oro.text.PatternCacheLRU;
 import org.apache.oro.text.regex.Pattern;
@@ -69,7 +78,11 @@ import org.apiguardian.api.API;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.LoadingCache;
 import com.thoughtworks.xstream.XStream;
+import com.thoughtworks.xstream.converters.reflection.PureJavaReflectionProvider;
+import com.thoughtworks.xstream.io.xml.StaxDriver;
 import com.thoughtworks.xstream.security.AnyTypePermission;
 import com.thoughtworks.xstream.security.NoTypePermission;
 
@@ -89,9 +102,23 @@ public class JMeterUtils implements UnitTestManager {
         private LazyPatternCacheHolder() {
             super();
         }
-        public static final PatternCacheLRU INSTANCE = new PatternCacheLRU(
+        private static final PatternCacheLRU INSTANCE = new PatternCacheLRU(
                 getPropDefault("oro.patterncache.size",1000), // $NON-NLS-1$
                 new Perl5Compiler());
+    }
+
+    private static final class LazyJavaPatternCacheHolder {
+        private LazyJavaPatternCacheHolder() {
+            super();
+        }
+        private static final LoadingCache<Map.Entry<String, Integer>, java.util.regex.Pattern> INSTANCE =
+                Caffeine
+                        .newBuilder()
+                        .maximumSize(getPropDefault("jmeter.regex.patterncache.size", 1000))
+                        .build(key -> {
+                            //noinspection MagicConstant
+                            return java.util.regex.Pattern.compile(key.getKey(), key.getValue().intValue());
+                        });
     }
 
     public static final String RES_KEY_PFX = "[res_key="; // $NON-NLS-1$
@@ -252,6 +279,14 @@ public class JMeterUtils implements UnitTestManager {
         return p;
     }
 
+    public static java.util.regex.Pattern compilePattern(String expression) {
+        return compilePattern(expression, 0);
+    }
+
+    public static java.util.regex.Pattern compilePattern(String expression, int flags) {
+        return LazyJavaPatternCacheHolder.INSTANCE.get(Map.entry(expression, Integer.valueOf(flags)));
+    }
+
     public static PatternCacheLRU getPatternCache() {
         return LazyPatternCacheHolder.INSTANCE;
     }
@@ -269,7 +304,6 @@ public class JMeterUtils implements UnitTestManager {
     public static Pattern getPattern(String expression) throws MalformedCachePatternException {
         return getPattern(expression, Perl5Compiler.READ_ONLY_MASK);
     }
-
     /**
      * Get a compiled expression from the pattern cache.
      *
@@ -292,6 +326,68 @@ public class JMeterUtils implements UnitTestManager {
     }
 
     /**
+     * Loads services implementing a given interface and scans JMeter search path for the implementations.
+     * This is a transition replacement for {@link ClassFinder}, and JMeter would migrate to {@link ServiceLoader}-only
+     * lookup in the future.
+     * <p>Note: it is not always safe to cache the result as {@code search_paths} property might change over time</p>
+     *
+     * @param service interface that services should extend.
+     * @param serviceLoader ServiceLoader to fetch services.
+     * @param classLoader classLoader to use when searching for classes on the search path.
+     * @param exceptionHandler exception handler to use for services that fail to load.
+     * @return collection of services that load successfully
+     * @param <S> type of service (class or interface)
+     */
+    @API(status = API.Status.DEPRECATED, since = "5.6")
+    public static <S> Collection<S> loadServicesAndScanJars(
+            @SuppressWarnings("BoundedWildcard") Class<S> service,
+            ServiceLoader<S> serviceLoader,
+            ClassLoader classLoader,
+            ServiceLoadExceptionHandler<? super S> exceptionHandler
+    ) {
+        Collection<S> services = ClassFinder.loadServices(service, serviceLoader, exceptionHandler);
+
+        List<String> classesFromJars;
+        try (ClassFinder.Closeable ignored = ClassFinder.skipJarsWithJmeterSkipClassScanningAttribute()) {
+            classesFromJars = findClassesThatExtend(service);
+        } catch (IOException e) {
+            log.warn("Unable to lookup {} with ClassFinder.findClassesThatExtend. " +
+                    "Will use only results from ServiceLoader ({} items found)", service, services.size(), e);
+            return services;
+        }
+
+        if (classesFromJars.isEmpty()) {
+            return services;
+        }
+
+        Set<String> loadedClasses = new HashSet<>((int) (services.size() / 0.75f) + 1);
+        for (S s : services) {
+            loadedClasses.add(s.getClass().getName());
+        }
+
+        List<S> result = new ArrayList<>(services.size() + classesFromJars.size());
+        result.addAll(services);
+        for (String className : classesFromJars) {
+            // Ignore classes that we loaded previously (e.g. with a ServiceLoader)
+            if (!loadedClasses.add(className)) {
+                continue;
+            }
+            try {
+                Class<? extends S> klass = Class.forName(className, false, classLoader)
+                        .asSubclass(service);
+                result.add(klass.getDeclaredConstructor().newInstance());
+            } catch (Throwable e) {
+                if (e instanceof InvocationTargetException) {
+                    //noinspection AssignmentToCatchBlockParameter
+                    e = e.getCause();
+                }
+                exceptionHandler.handle(service, className, e);
+            }
+        }
+        return result;
+    }
+
+    /**
      * Convenience method for
      * {@link ClassFinder#findClassesThatExtend(String[], Class[], boolean)}
      * with the option to include inner classes in the search set to false
@@ -300,7 +396,10 @@ public class JMeterUtils implements UnitTestManager {
      * @param superClass - single class to search for
      * @return List of Strings containing discovered class names.
      * @throws IOException when the used {@link ClassFinder} throws one while searching for the class
+     * @deprecated use {@link #loadServicesAndScanJars(Class, ServiceLoader, ClassLoader, ServiceLoadExceptionHandler)} instead
      */
+    @API(status = API.Status.DEPRECATED, since = "5.6")
+    @Deprecated
     public static List<String> findClassesThatExtend(Class<?> superClass)
         throws IOException {
         return ClassFinder.findClassesThatExtend(getSearchPaths(), new Class[]{superClass}, false);
@@ -714,6 +813,28 @@ public class JMeterUtils implements UnitTestManager {
     }
 
     /**
+     * Get an array of String if present and not empty, defaultValue if not present.
+     *
+     * @param propName
+     *            the name of the property.
+     * @param defaultVal
+     *            the default value.
+     * @return The PropDefault value
+     */
+    public static String[] getArrayPropDefault(String propName, String[] defaultVal) {
+        try {
+            String strVal = appProperties.getProperty(propName);
+            if (StringUtilities.isNotBlank(strVal)) {
+                return strVal.trim().split("\\s+");
+            }
+        } catch (Exception e) {
+            log.warn("Exception '{}' occurred when fetching Array property:'{}', defaulting to: {}",
+                    e.getMessage(), propName, defaultVal != null ? Arrays.toString(defaultVal) : null);
+        }
+        return defaultVal;
+    }
+
+    /**
      * Get a long value with default if not present.
      *
      * @param propName
@@ -870,14 +991,17 @@ public class JMeterUtils implements UnitTestManager {
             System.out.println(errorMsg); // NOSONAR intentional
             return; // Done
         }
-        try {
-            JOptionPane.showMessageDialog(instance.getMainFrame(),
-                    formatMessage(errorMsg),
-                    titleMsg,
-                    JOptionPane.ERROR_MESSAGE);
-        } catch (HeadlessException e) {
-            log.warn("reportErrorToUser(\"{}\") caused", errorMsg, e);
-        }
+        String errorMessage = errorMsg;
+        SwingUtilities.invokeLater(() -> {
+            try {
+                JOptionPane.showMessageDialog(instance.getMainFrame(),
+                        formatMessage(errorMessage),
+                        titleMsg,
+                        JOptionPane.ERROR_MESSAGE);
+            } catch (HeadlessException e) {
+                log.warn("reportErrorToUser(\"{}\") caused", errorMessage, e);
+            }
+        });
     }
 
     /**
@@ -893,14 +1017,16 @@ public class JMeterUtils implements UnitTestManager {
             System.out.println(msg); // NOSONAR intentional
             return; // Done
         }
-        try {
-            JOptionPane.showMessageDialog(instance.getMainFrame(),
-                    formatMessage(msg),
-                    titleMsg,
-                    JOptionPane.INFORMATION_MESSAGE);
-        } catch (HeadlessException e) {
-            log.warn("reportInfoToUser(\"{}\") caused", msg, e);
-        }
+        SwingUtilities.invokeLater(() -> {
+            try {
+                JOptionPane.showMessageDialog(instance.getMainFrame(),
+                        formatMessage(msg),
+                        titleMsg,
+                        JOptionPane.INFORMATION_MESSAGE);
+            } catch (HeadlessException e) {
+                log.warn("reportInfoToUser(\"{}\") caused", msg, e);
+            }
+        });
     }
 
     private static JScrollPane formatMessage(String errorMsg) {
@@ -1120,6 +1246,7 @@ public class JMeterUtils implements UnitTestManager {
      *            multi-line string headers
      * @return a map name/value for each header
      */
+    @SuppressWarnings("NonApiType")
     public static LinkedHashMap<String, String> parseHeaders(String headers) {
         LinkedHashMap<String, String> linkedHeaders = new LinkedHashMap<>();
         String[] list = headers.split("\n"); // $NON-NLS-1$
@@ -1291,8 +1418,8 @@ public class JMeterUtils implements UnitTestManager {
     /**
      * @return {@link XStream} XStream instance following JMeter security policy
      */
-    public static final XStream createXStream() {
-        XStream xstream = new XStream();
+    public static XStream createXStream() {
+        XStream xstream = new XStream(new PureJavaReflectionProvider(), new JMeterStaxDriver());
         JMeterUtils.setupXStreamSecurityPolicy(xstream);
         return xstream;
     }

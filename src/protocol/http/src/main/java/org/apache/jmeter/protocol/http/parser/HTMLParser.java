@@ -25,7 +25,7 @@ import java.util.LinkedHashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.apache.commons.lang3.StringUtils;
+import org.apache.jorphan.util.StringUtilities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,6 +63,7 @@ public abstract class HTMLParser extends BaseParser {
 
     protected static final String SHORTCUT_ICON     = "shortcut icon";
     protected static final String ICON              = "icon";
+    protected static final String PRELOAD           = "preload";
 
     protected static final String IE_UA             = "MSIE ([0-9]+.[0-9]+)";// $NON-NLS-1$
     protected static final Pattern IE_UA_PATTERN    = Pattern.compile(IE_UA);
@@ -190,7 +191,7 @@ public abstract class HTMLParser extends BaseParser {
      * @param ieVersion Float IE version
      * @return true if IE version &lt; IE v10
      */
-    protected final boolean isEnableConditionalComments(Float ieVersion) {
+    protected static boolean isEnableConditionalComments(Float ieVersion) {
         // Conditional comment have been dropped in IE10
         // http://msdn.microsoft.com/en-us/library/ie/hh801214%28v=vs.85%29.aspx
         return ieVersion != null && ieVersion < IE_10;
@@ -202,7 +203,7 @@ public abstract class HTMLParser extends BaseParser {
      * @return version null if not IE or the version after MSIE
      */
     protected Float extractIEVersion(String userAgent) {
-        if (StringUtils.isEmpty(userAgent)) {
+        if (StringUtilities.isEmpty(userAgent)) {
             log.info("userAgent is null");
             return null;
         }
@@ -228,7 +229,7 @@ public abstract class HTMLParser extends BaseParser {
      * @return normalized url
      */
     protected static String normalizeUrlValue(CharSequence url) {
-        if (!StringUtils.isEmpty(url)) {
+        if (StringUtilities.isNotEmpty(url)) {
             String trimmed = NORMALIZE_URL_PATTERN.matcher(url.toString().trim()).replaceAll("");
             if (!trimmed.isEmpty()) {
                 return trimmed;

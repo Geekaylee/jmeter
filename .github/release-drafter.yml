@@ -1,0 +1,79 @@
+# See https://github.com/release-drafter/release-drafter#configuration-options
+name-template: 'v$RESOLVED_VERSION'
+tag-template: 'rel/v$RESOLVED_VERSION'
+categories:
+  - type: 'pre-exclude'
+    when:
+      label: 'skip-changelog'
+  - title: '🚀 Features'
+    when:
+      labels:
+        - 'feature'
+        - 'enhancement'
+  - title: '🐛 Bug Fixes'
+    when:
+      labels:
+        - 'fix'
+        - 'bugfix'
+        - 'bug'
+        - 'defect'
+  - title: '📝 Documentation'
+    when:
+      label: 'documentation'
+  - title: '🧰 Maintenance'
+    when:
+      label: 'chore'
+  - title: '⬆️ Dependencies'
+    collapse-after: 8
+    when:
+      label: 'dependencies'
+  - type: 'version-resolver'
+    semver-increment: 'major'
+    when:
+      label: 'major'
+  - type: 'version-resolver'
+    semver-increment: 'minor'
+    when:
+      label: 'minor'
+  - type: 'version-resolver'
+    semver-increment: 'patch'
+    when:
+      label: 'patch'
+change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
+change-title-escapes: '\<*_&' # You can add # and @ to disable mentions, and add ` to disable code blocks.
+version-resolver:
+  default: patch
+template: |
+  ## Changes
+
+  $CHANGES
+# See https://github.com/release-drafter/release-drafter#autolabeler
+# This is more like a reference, since auto-labelling PRs seems to require too much privileges
+autolabeler:
+  - label: 'dependencies'
+    files:
+      - 'gradle-wrapper.properties'
+    title:
+      - '/^fix\(deps\)/i'
+      - '/^chore:\s*bump/i'
+  - label: 'chore'
+    files:
+      - '*gradle*'
+    branch:
+      - '/docs{0,1}\/.+/'
+    title:
+      - '/^chore/i'
+  - label: 'documentation'
+    files:
+      - '*.md'
+      - 'docs/**'
+  - label: 'bug'
+    branch:
+      - '/fix\/.+/'
+    title:
+      - '/^fix/i'
+  - label: 'enhancement'
+    branch:
+      - '/feature\/.+/'
+    title:
+      - '/^feat/i'

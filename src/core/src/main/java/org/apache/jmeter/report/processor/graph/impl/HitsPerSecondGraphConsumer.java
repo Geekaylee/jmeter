@@ -36,13 +36,6 @@ import org.apache.jmeter.report.processor.graph.TimeStampKeysSelector;
  */
 public class HitsPerSecondGraphConsumer extends AbstractOverTimeGraphConsumer {
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see
-     * org.apache.jmeter.report.csv.processor.impl.AbstractOverTimeGraphConsumer
-     * #createTimeStampKeysSelector()
-     */
     @Override
     protected TimeStampKeysSelector createTimeStampKeysSelector() {
         TimeStampKeysSelector keysSelector = new TimeStampKeysSelector();
@@ -50,12 +43,6 @@ public class HitsPerSecondGraphConsumer extends AbstractOverTimeGraphConsumer {
         return keysSelector;
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see org.apache.jmeter.report.csv.processor.impl.AbstractGraphConsumer#
-     * createGroupInfos()
-     */
     @Override
     protected Map<String, GroupInfo> createGroupInfos() {
         return Collections.singletonMap(
@@ -64,19 +51,6 @@ public class HitsPerSecondGraphConsumer extends AbstractOverTimeGraphConsumer {
                         new TimeRateAggregatorFactory(), new StaticSeriesSelector(),
                         // We ignore Transaction Controller results
                         new CountValueSelector(true), false, false));
-    }
-
-    /*
-     * (non-Javadoc)
-     *
-     * @see
-     * org.apache.jmeter.report.csv.processor.impl.AbstractOverTimeGraphConsumer
-     * #setGranularity(long)
-     */
-    @Override
-    public void setGranularity(long granularity) {
-        super.setGranularity(granularity);
-
     }
 
     @Override
@@ -90,17 +64,5 @@ public class HitsPerSecondGraphConsumer extends AbstractOverTimeGraphConsumer {
         ((StaticSeriesSelector) getGroupInfos().get(
                 AbstractGraphConsumer.DEFAULT_GROUP).getSeriesSelector())
                 .setSeriesName(getName());
-    }
-
-    /*
-     * (non-Javadoc)
-     *
-     * @see
-     * org.apache.jmeter.report.csv.processor.AbstractSampleConsumer#setName
-     * (java.lang.String)
-     */
-    @Override
-    public void setName(String name) {
-        super.setName(name);
     }
 }

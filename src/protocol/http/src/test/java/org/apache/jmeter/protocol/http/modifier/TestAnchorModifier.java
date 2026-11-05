@@ -17,9 +17,7 @@
 
 package org.apache.jmeter.protocol.http.modifier;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.File;
 import java.net.MalformedURLException;
@@ -37,6 +35,7 @@ import org.apache.jmeter.save.SaveService;
 import org.apache.jmeter.threads.JMeterContext;
 import org.apache.jmeter.threads.JMeterContextService;
 import org.apache.jorphan.io.TextFile;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -179,7 +178,7 @@ public class TestAnchorModifier extends JMeterTestCase {
         jmctx.setPreviousResult(result);
         parser.process();
         String newUrl = config.getUrl().toString();
-        assertTrue("http://www.apache.org/index.html".equals(newUrl)
+        Assertions.assertTrue("http://www.apache.org/index.html".equals(newUrl)
                 || "http://www.apache.org/subdir/lowerdir/index.html".equals(newUrl));
     }
 
@@ -288,7 +287,7 @@ public class TestAnchorModifier extends JMeterTestCase {
         jmctx.setPreviousResult(result);
         parser.process();
         String newUrl = config.getUrl().toString();
-        assertNotEquals("http://www.apache.org/home/index.html?param1=value1", newUrl);
+        Assertions.assertNotEquals("http://www.apache.org/home/index.html?param1=value1", newUrl);
         assertEquals(config.getUrl().toString(), newUrl);
     }
 
@@ -360,7 +359,7 @@ public class TestAnchorModifier extends JMeterTestCase {
     }
 
 
-    private HTTPSamplerBase makeContext(String url) throws MalformedURLException {
+    private static HTTPSamplerBase makeContext(String url) throws MalformedURLException {
         URL u = new URL(url);
         HTTPSamplerBase context = new HTTPNullSampler();
         context.setDomain(u.getHost());
@@ -371,7 +370,7 @@ public class TestAnchorModifier extends JMeterTestCase {
         return context;
     }
 
-    private HTTPSamplerBase makeUrlConfig(String path) {
+    private static HTTPSamplerBase makeUrlConfig(String path) {
         HTTPSamplerBase config = new HTTPNullSampler();
         config.setDomain("www.apache.org");
         config.setMethod(HTTPConstants.GET);

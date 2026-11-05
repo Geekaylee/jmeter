@@ -25,8 +25,9 @@ import java.util.List;
 
 import org.apache.jmeter.config.Argument;
 import org.apache.jmeter.config.Arguments;
-import org.apache.jmeter.testelement.property.BooleanProperty;
 import org.apache.jmeter.testelement.property.JMeterProperty;
+import org.apache.jmeter.testelement.schema.PropertiesAccessor;
+import org.apache.jorphan.util.StringUtilities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,17 +38,9 @@ import org.slf4j.LoggerFactory;
  * Represents an Argument for HTTP requests.
  */
 public class HTTPArgument extends Argument implements Serializable {
-    private static final String DEFAULT_CONTENT_TYPE = "text/plain";
-
     private static final Logger log = LoggerFactory.getLogger(HTTPArgument.class);
 
     private static final long serialVersionUID = 241L;
-
-    private static final String ALWAYS_ENCODE = "HTTPArgument.always_encode";
-
-    private static final String USE_EQUALS = "HTTPArgument.use_equals";
-
-    private static final String CONTENT_TYPE = "HTTPArgument.content_type";
 
     private static final EncoderCache cache = new EncoderCache(1000);
 
@@ -68,18 +61,28 @@ public class HTTPArgument extends Argument implements Serializable {
         this.setMetaData(metadata);
     }
 
+    @Override
+    public HTTPArgumentSchema getSchema() {
+        return HTTPArgumentSchema.INSTANCE;
+    }
+
+    @Override
+    public PropertiesAccessor<? extends HTTPArgument, ? extends HTTPArgumentSchema> getProps() {
+        return new PropertiesAccessor<>(this, getSchema());
+    }
+
     public void setUseEquals(boolean ue) {
         if (ue) {
             setMetaData("=");
         } else {
             setMetaData("");
         }
-        setProperty(new BooleanProperty(USE_EQUALS, ue));
+        set(getSchema().getUseEquals(), ue);
     }
 
     public boolean isUseEquals() {
-        boolean eq = getPropertyAsBoolean(USE_EQUALS);
-        if (getMetaData().equals("=") || (getValue() != null && getValue().length() > 0)) {
+        boolean eq = get(getSchema().getUseEquals());
+        if (getMetaData().equals("=") || StringUtilities.isNotEmpty(getValue())) {
             setUseEquals(true);
             return true;
         }
@@ -88,19 +91,19 @@ public class HTTPArgument extends Argument implements Serializable {
     }
 
     public void setContentType(String ct) {
-        setProperty(CONTENT_TYPE, ct, HTTPArgument.DEFAULT_CONTENT_TYPE);
+        set(getSchema().getContentType(), ct);
     }
 
     public String getContentType() {
-        return getPropertyAsString(CONTENT_TYPE, HTTPArgument.DEFAULT_CONTENT_TYPE);
+        return get(getSchema().getContentType());
     }
 
     public void setAlwaysEncoded(boolean ae) {
-        setProperty(new BooleanProperty(ALWAYS_ENCODE, ae));
+        set(getSchema().getAlwaysEncode(), ae);
     }
 
     public boolean isAlwaysEncoded() {
-        return getPropertyAsBoolean(ALWAYS_ENCODE);
+        return get(getSchema().getAlwaysEncode());
     }
 
     /**
@@ -158,6 +161,13 @@ public class HTTPArgument extends Argument implements Serializable {
             } catch (UnsupportedEncodingException e) {
                 log.error("{} encoding not supported!", contentEncoding);
                 throw new Error(e.toString(), e);
+            } catch (IllegalArgumentException e) {
+                // Handle malformed percent-encoded strings (e.g., "%u2", "%ZZ", "text%")
+                // This can occur when recording real-world web traffic with encoding bugs
+                // See Bug 6456
+                log.warn("Malformed percent-encoded parameter detected - using original value. " +
+                        "Name: '{}', Value: '{}', Error: {}", name, value, e.getMessage());
+                // Keep the original encoded values as-is
             }
         }
         setName(name);

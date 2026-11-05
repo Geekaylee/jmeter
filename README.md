@@ -8,7 +8,7 @@ By The Apache Software Foundation
 [![codecov](https://codecov.io/gh/apache/jmeter/branch/master/graph/badge.svg)](https://codecov.io/gh/apache/jmeter)
 [![License](https://img.shields.io/:license-apache-brightgreen.svg)](https://www.apache.org/licenses/LICENSE-2.0.html)
 [![Stack Overflow](https://img.shields.io/:stack%20overflow-jmeter-brightgreen.svg)](https://stackoverflow.com/questions/tagged/jmeter)
-[![Maven Central](https://maven-badges.herokuapp.com/maven-central/org.apache.jmeter/ApacheJMeter/badge.svg)](https://maven-badges.herokuapp.com/maven-central/org.apache.jmeter/ApacheJMeter)
+[![Maven Central](https://img.shields.io/maven-central/v/org.apache.jmeter/ApacheJMeter.svg?label=Maven%20Central)](https://search.maven.org/artifact/org.apache.jmeter/ApacheJMeter)
 [![Javadocs](https://www.javadoc.io/badge/org.apache.jmeter/ApacheJMeter_core.svg)](https://www.javadoc.io/doc/org.apache.jmeter/ApacheJMeter_core)
 [![Twitter](https://img.shields.io/twitter/url/https/github.com/apache/jmeter.svg?style=social)](https://twitter.com/intent/tweet?text=Powerful%20load%20testing%20with%20Apache%20JMeter:&url=https://jmeter.apache.org)
 
@@ -92,7 +92,7 @@ The following requirements exist for running Apache JMeter:
 
 - Java Interpreter:
 
-  A fully compliant Java 8 Runtime Environment is required
+  A fully compliant Java 17 Runtime Environment is required
   for Apache JMeter to execute. A JDK with `keytool` utility is better suited
   for Recording HTTPS websites.
 
@@ -136,8 +136,8 @@ a JMX file onto:
 ## Documentation
 
 The documentation available as of the date of this release is
-also included, in HTML format, in the [printable_docs](printable_docs) directory,
-and it may be browsed starting from the file called [index.html](printable_docs/index.html).
+also included, in HTML format, in the [docs](docs) directory,
+and it may be browsed starting from the file called [index.html](docs/index.html).
 
 ## Reporting a bug/enhancement
 
@@ -175,12 +175,26 @@ systemProp.https.proxyPassword=your_password
 
 ### Test builds
 
-JMeter is built using Gradle.
+JMeter is built using Gradle, and it uses [Gradle's Toolchains for JVM projects](https://docs.gradle.org/current/userguide/toolchains.html)
+for provisioning JDKs. It means the code would search for the needed JDKs locally, or download them
+if they are not found.
+
+By default, the code would use JDK 17 for build purposes, however it would set the target release to 8,
+so the resulting artifacts would be compatible with Java 8.
 
 The following command builds and tests JMeter:
 
 ```sh
 ./gradlew build
+```
+
+If you want to use a custom JDK for building you can set `-PjdkBuildVersion=11`,
+and you can select `-PjdkTestVersion=21` if you want to use a different JDK for testing.
+
+You can list the available build parameters by executing
+
+```sh
+./gradlew parameters
 ```
 
 If the system does not have a GUI display then:
@@ -196,7 +210,7 @@ The following command would compile the application and enable you to run `jmete
 from the `bin` directory.
 
 > **Note** that it completely refreshes `lib/` contents,
-so it would remove custom plugins should you have them installed.
+so it would remove custom plugins should you have them installed to `lib/`. However, it would keep `lib/ext/` plugins intact.
 
 ```sh
 ./gradlew createDist
@@ -266,3 +280,11 @@ Apache JMeter does not include any implementation of JSSE or JCE.
 ## Thanks
 
 **Thank you for using Apache JMeter.**
+
+### Third party notices
+
+* Notice for mxparser:
+
+  >  This product includes software developed by the Indiana
+  >  University Extreme! Lab.  For further information please visit
+  >  http://www.extreme.indiana.edu/

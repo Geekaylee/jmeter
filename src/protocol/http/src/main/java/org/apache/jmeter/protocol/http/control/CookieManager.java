@@ -42,6 +42,7 @@ import org.apache.jmeter.util.JMeterUtils;
 import org.apache.jorphan.reflect.ClassTools;
 import org.apache.jorphan.util.JMeterException;
 import org.apache.jorphan.util.JOrphanUtils;
+import org.apache.jorphan.util.StringUtilities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -104,10 +105,6 @@ public class CookieManager extends ConfigTestElement implements TestStateListene
     /**
      * Defines the implementation that is assumed when the JMX file does not contain an entry for it
      * MUST NOT BE CHANGED otherwise JMX files will not be correctly interpreted
-     * <p>
-     * The default implementation for new CookieManager elements is defined by
-     * {@link org.apache.jmeter.protocol.http.gui.CookiePanel#DEFAULT_IMPLEMENTATION CookiePanel#DEFAULT_IMPLEMENTATION}
-     *
      */
     private static final String DEFAULT_IMPLEMENTATION = HC4CookieHandler.class.getName();
 
@@ -222,7 +219,7 @@ public class CookieManager extends ConfigTestElement implements TestStateListene
             final CollectionProperty cookies = getCookies();
             while ((line = reader.readLine()) != null) {
                 try {
-                    if (line.startsWith("#") || JOrphanUtils.isBlank(line)) {//$NON-NLS-1$
+                    if (line.startsWith("#") || StringUtilities.isBlank(line)) {//$NON-NLS-1$
                         continue;
                     }
                     String[] st = JOrphanUtils.split(line, TAB, false);
@@ -239,7 +236,7 @@ public class CookieManager extends ConfigTestElement implements TestStateListene
                         throw new IOException("Expected "+_fields+" fields, found "+st.length+" in "+line);
                     }
 
-                    if (st[_path].length()==0) {
+                    if (st[_path].isEmpty()) {
                         st[_path] = "/"; //$NON-NLS-1$
                     }
                     boolean secure = Boolean.parseBoolean(st[_secure]);
@@ -257,7 +254,7 @@ public class CookieManager extends ConfigTestElement implements TestStateListene
         }
     }
 
-    private String cookieToString(Cookie c){
+    private static String cookieToString(Cookie c){
         StringBuilder sb=new StringBuilder(80);
         sb.append(c.getDomain());
         //flag - if all machines within a given domain can access the variable.
@@ -293,7 +290,7 @@ public class CookieManager extends ConfigTestElement implements TestStateListene
         String cn = c.getName();
         removeMatchingCookies(c); // Can't have two matching cookies
 
-        if (DELETE_NULL_COOKIES && (null == cv || cv.length()==0)) {
+        if (DELETE_NULL_COOKIES && (null == cv || cv.isEmpty())) {
             if (log.isDebugEnabled()) {
                 log.debug("Dropping cookie with null value {}", c.toString());
             }
@@ -318,7 +315,7 @@ public class CookieManager extends ConfigTestElement implements TestStateListene
         clearCookies(); // ensure data is set up OK initially
     }
 
-    /*
+    /**
      * Remove all the cookies.
      */
     private void clearCookies() {
@@ -369,7 +366,7 @@ public class CookieManager extends ConfigTestElement implements TestStateListene
      * @param b
      * @return true if cookies match
      */
-    private boolean match(Cookie a, Cookie b){
+    private static boolean match(Cookie a, Cookie b){
         return
         a.getName().equals(b.getName())
         &&

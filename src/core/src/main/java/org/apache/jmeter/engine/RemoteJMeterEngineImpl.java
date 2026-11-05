@@ -184,10 +184,6 @@ public final class RemoteJMeterEngineImpl extends java.rmi.server.UnicastRemoteO
         log.info("... stopped");
     }
 
-    /*
-     * Called by:
-     * - ClientJMeterEngine.exe() which is called on remoteStop
-     */
     @Override
     public void rexit() throws RemoteException {
         log.info("Exiting");
@@ -220,6 +216,7 @@ public final class RemoteJMeterEngineImpl extends java.rmi.server.UnicastRemoteO
     }
 
     @Override
+    @SuppressWarnings("NonApiType")
     public void rsetProperties(HashMap<String, String> map) throws RemoteException { // NOSONAR
         checkOwner("setProperties");
         if(remotelySetProperties != null) {

@@ -19,29 +19,25 @@ package org.apache.jmeter.gui.action;
 
 import java.util.List;
 
-import org.apache.commons.lang3.StringUtils;
+import org.apache.jorphan.util.StringUtilities;
+
+import kotlin.text.StringsKt;
 
 /**
  * Searcher implementation that searches text as is
  */
 public class RawTextSearcher implements Searcher {
-    private boolean caseSensitive;
-    private String textToSearch;
-
+    private final boolean caseSensitive;
+    private final String textToSearch;
 
     /**
      * Constructor
-     * @param caseSensitive is search case sensitive
+     * @param caseSensitive is search case-sensitive
      * @param textToSearch Text to search
      */
     public RawTextSearcher(boolean caseSensitive, String textToSearch) {
-        super();
         this.caseSensitive = caseSensitive;
-        if (caseSensitive) {
-            this.textToSearch = textToSearch;
-        } else {
-            this.textToSearch = textToSearch.toLowerCase();
-        }
+        this.textToSearch = textToSearch;
     }
 
     /**
@@ -50,9 +46,8 @@ public class RawTextSearcher implements Searcher {
     @Override
     public boolean search(List<String> textTokens) {
         return textTokens.stream()
-                .filter(token -> !StringUtils.isEmpty(token))
-                .map(token -> caseSensitive ? token : token.toLowerCase())
-                .anyMatch(token -> token.contains(textToSearch));
+                .filter(StringUtilities::isNotEmpty)
+                .anyMatch(token -> StringsKt.contains(token, textToSearch, !caseSensitive));
     }
 
     @Override

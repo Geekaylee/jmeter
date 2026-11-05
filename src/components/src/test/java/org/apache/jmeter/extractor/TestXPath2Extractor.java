@@ -17,8 +17,8 @@
 
 package org.apache.jmeter.extractor;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.io.UnsupportedEncodingException;
 
@@ -282,6 +282,6 @@ public class TestXPath2Extractor {
         jmc.setPreviousResult(null);
         extractor.setXPathQuery("/book/preface");
         extractor.process();
-        assertEquals(null, vars.get(VAL_NAME));
+        assertNull(vars.get(VAL_NAME));
     }
 }

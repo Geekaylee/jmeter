@@ -51,7 +51,7 @@ import org.apache.jmeter.testelement.property.TestElementProperty;
 import org.apache.jmeter.threads.JMeterContextService;
 import org.apache.jmeter.threads.JMeterVariables;
 import org.apache.jmeter.util.JMeterUtils;
-import org.apache.jorphan.util.JOrphanUtils;
+import org.apache.jorphan.util.StringUtilities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,10 +97,10 @@ public class AuthManager extends ConfigTestElement implements TestStateListener,
 
     private static final boolean DEFAULT_CLEAR_VALUE = false;
 
-    /** Decides whether port should be omitted from SPN for kerberos spnego authentication */
+    /** Decides whether port should be omitted from SPN for Kerberos SPNEGO authentication */
     public static final boolean STRIP_PORT = JMeterUtils.getPropDefault("kerberos.spnego.strip_port", true);
 
-    /** Decides whether port should be omitted from SPN for kerberos spnego authentication */
+    /** Decides whether SPN for Kerberos SPNEGO authentication should be acquired for the canonicalized host name*/
     public static final boolean USE_CANONICAL_HOST_NAME = JMeterUtils.getPropDefault("kerberos.spnego.use_canonical_host_name", true);
 
     public enum Mechanism {
@@ -135,7 +135,7 @@ public class AuthManager extends ConfigTestElement implements TestStateListener,
         }
     }
 
-    private KerberosManager kerberosManager = new KerberosManager();
+    private final KerberosManager kerberosManager = new KerberosManager();
 
     /**
      * Default Constructor.
@@ -390,7 +390,7 @@ public class AuthManager extends ConfigTestElement implements TestStateListener,
             String line;
             while ((line = reader.readLine()) != null) {
                 try {
-                    if (line.startsWith("#") || JOrphanUtils.isBlank(line)) { //$NON-NLS-1$
+                    if (line.startsWith("#") || StringUtilities.isBlank(line)) { //$NON-NLS-1$
                         continue;
                     }
                     String[] tokens = line.split("\t"); //$NON-NLS-1$
@@ -502,8 +502,9 @@ public class AuthManager extends ConfigTestElement implements TestStateListener,
      *
      * @param url to be checked
      * @return <code>true</code> when port should omitted in SPN
+     * @since 6.0
      */
-    private boolean isStripPort(URL url) {
+    public static boolean isStripPort(URL url) {
         if (STRIP_PORT) {
             return true;
         }
@@ -518,7 +519,7 @@ public class AuthManager extends ConfigTestElement implements TestStateListener,
      * @param b {@link Authorization}
      * @return true if a and b match
      */
-    private boolean match(Authorization a, Authorization b){
+    private static boolean match(Authorization a, Authorization b){
         return
                 a.getURL().equals(b.getURL())&&
                 a.getDomain().equals(b.getDomain())&&

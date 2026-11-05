@@ -27,11 +27,14 @@ import org.apache.jmeter.samplers.Sampler;
 import org.apache.jmeter.threads.JMeterVariables;
 import org.apache.jmeter.util.JMeterUtils;
 
+import com.google.auto.service.AutoService;
+
 /**
  * Test if a JMeter variable is defined
  *
  * @since 4.0
  */
+@AutoService(Function.class)
 public class IsVarDefined extends AbstractFunction {
 
     private static final List<String> desc = new ArrayList<>();
@@ -55,7 +58,7 @@ public class IsVarDefined extends AbstractFunction {
             String variableValue = jMeterVariables.get(variableName);
             return Boolean.toString(variableValue != null);
         } else {
-            return Boolean.FALSE.toString();
+            return "false";
         }
     }
 

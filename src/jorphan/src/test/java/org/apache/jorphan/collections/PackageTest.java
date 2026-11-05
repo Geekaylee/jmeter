@@ -17,11 +17,11 @@
 
 package org.apache.jorphan.collections;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -97,11 +97,11 @@ public class PackageTest {
         ListedHashTree tree = new ListedHashTree("key");
         ListedHashTree newTree = new ListedHashTree("value");
         tree.add("key", newTree);
-        assertEquals(tree.list().size(), 1);
+        assertEquals(1, tree.list().size());
         assertEquals("key", tree.getArray()[0]);
         assertEquals(1, tree.getTree("key").list().size());
         assertEquals(0, tree.getTree("key").getTree("value").size());
-        assertEquals(tree.getTree("key").getArray()[0], "value");
+        assertEquals("value", tree.getTree("key").getArray()[0]);
         assertNotNull(tree.getTree("key").get("value"));
     }
 

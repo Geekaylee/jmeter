@@ -28,6 +28,8 @@ import org.apache.jmeter.util.JMeterUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.auto.service.AutoService;
+
 /**
  * <p>
  * Function to log a message.
@@ -43,6 +45,7 @@ import org.slf4j.LoggerFactory;
  * Returns: - Empty String (so can be used where return value would be a nuisance)
  * @since 2.2
  */
+@AutoService(Function.class)
 public class LogFunction2 extends AbstractFunction {
     private static final Logger log = LoggerFactory.getLogger(LogFunction2.class);
 
@@ -76,7 +79,7 @@ public class LogFunction2 extends AbstractFunction {
         String priorityString;
         if (values.length > 1) { // We have a default
             priorityString = ((CompoundVariable) values[1]).execute();
-            if (priorityString.length() == 0) {
+            if (priorityString.isEmpty()) {
                 priorityString = DEFAULT_PRIORITY;
             }
         } else {

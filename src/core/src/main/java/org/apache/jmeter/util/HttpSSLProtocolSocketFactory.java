@@ -67,11 +67,10 @@ public class HttpSSLProtocolSocketFactory
     }
 
 
-    private void configureSocket(Socket socket){
-        if (!(socket instanceof SSLSocket)) {
+    private static void configureSocket(Socket socket){
+        if (!(socket instanceof SSLSocket sock)) {
             throw new IllegalArgumentException("Expected SSLSocket");
         }
-        SSLSocket sock = (SSLSocket) socket;
         if (!PROTOCOL_LIST.isEmpty()) {
             try {
                 sock.setEnabledProtocols(protocols);
@@ -95,7 +94,7 @@ public class HttpSSLProtocolSocketFactory
         }
     }
 
-    private String join(String[] strings) {
+    private static String join(String[] strings) {
         StringBuilder sb = new StringBuilder();
         for (int i=0;i<strings.length;i++){
             if (i>0) {
@@ -106,7 +105,7 @@ public class HttpSSLProtocolSocketFactory
         return sb.toString();
     }
 
-    private SSLSocketFactory getSSLSocketFactory() throws IOException {
+    private static SSLSocketFactory getSSLSocketFactory() throws IOException {
         try {
             SSLContext sslContext = ((JsseSSLManager)SSLManager.getInstance()).getContext();
             return sslContext.getSocketFactory();
@@ -115,7 +114,7 @@ public class HttpSSLProtocolSocketFactory
         }
     }
 
-    /*
+    /**
      * Wraps the socket in a slow SSL socket if necessary
      */
     private Socket wrapSocket(Socket sock){

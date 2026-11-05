@@ -36,13 +36,6 @@ import org.apache.jmeter.report.processor.graph.TimeStampKeysSelector;
  */
 public class CodesPerSecondGraphConsumer extends AbstractOverTimeGraphConsumer {
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see
-     * org.apache.jmeter.report.csv.processor.impl.AbstractOverTimeGraphConsumer
-     * #createTimeStampKeysSelector()
-     */
     @Override
     protected TimeStampKeysSelector createTimeStampKeysSelector() {
         TimeStampKeysSelector keysSelector = new TimeStampKeysSelector();
@@ -50,12 +43,6 @@ public class CodesPerSecondGraphConsumer extends AbstractOverTimeGraphConsumer {
         return keysSelector;
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see org.apache.jmeter.report.csv.processor.impl.AbstractGraphConsumer#
-     * createGroupInfos()
-     */
     @Override
     protected Map<String, GroupInfo> createGroupInfos() {
         return Collections.singletonMap(
@@ -77,17 +64,5 @@ public class CodesPerSecondGraphConsumer extends AbstractOverTimeGraphConsumer {
                 .get(AbstractGraphConsumer.DEFAULT_GROUP)
                 .getAggregatorFactory())
                 .setGranularity(getGranularity());
-    }
-
-    /*
-     * (non-Javadoc)
-     *
-     * @see
-     * org.apache.jmeter.report.csv.processor.impl.AbstractOverTimeGraphConsumer
-     * #setGranularity(long)
-     */
-    @Override
-    public void setGranularity(long granularity) {
-        super.setGranularity(granularity);
     }
 }

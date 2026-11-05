@@ -20,10 +20,10 @@ package org.apache.jmeter.report.processor;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
-import org.apache.commons.lang3.Validate;
 import org.apache.jmeter.report.core.CsvSampleReader;
 import org.apache.jmeter.report.core.Sample;
 import org.apache.jmeter.report.core.SampleException;
@@ -69,13 +69,13 @@ public class CsvFileSampleSource extends AbstractSampleSource {
     private static final Logger LOG = LoggerFactory.getLogger(CsvFileSampleSource.class);
 
     /** input csv files to be produced */
-    private File[] inputFiles;
+    private final File[] inputFiles;
 
     /** csv readers corresponding to the input files */
-    private CsvSampleReader[] csvReaders;
+    private final CsvSampleReader[] csvReaders;
 
     /** mock producer to produce samples to its consumers */
-    private PrivateProducer producer;
+    private final PrivateProducer producer;
 
     /**
      * Build a sample source from the specified input file and character
@@ -141,7 +141,7 @@ public class CsvFileSampleSource extends AbstractSampleSource {
     /**
      * Get the current time in milliseconds
      */
-    private long now() {
+    private static long now() {
         return System.currentTimeMillis();
     }
 
@@ -151,7 +151,7 @@ public class CsvFileSampleSource extends AbstractSampleSource {
      *
      * @return A readable string that displays the time provided as milliseconds
      */
-    private String time(long t) {
+    private static String time(long t) {
         return TimeHelper.time(t);
     }
 
@@ -161,7 +161,9 @@ public class CsvFileSampleSource extends AbstractSampleSource {
      */
     private void produce() {
         SampleContext context = getSampleContext();
-        Validate.validState(context != null, "Set a sample context before producing samples.");
+        if (context == null) {
+            throw new IllegalStateException("Set a sample context before producing samples.");
+        }
 
         for (int i = 0; i < csvReaders.length; i++) {
             long sampleCount = 0;
@@ -189,37 +191,16 @@ public class CsvFileSampleSource extends AbstractSampleSource {
         }
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see
-     * org.apache.jmeter.report.processor.AbstractSampleSource#addSampleConsumers
-     * (java.util.List)
-     */
     @Override
     public void setSampleConsumers(List<SampleConsumer> consumers) {
         producer.setSampleConsumers(consumers);
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see
-     * org.apache.jmeter.report.processor.AbstractSampleSource#addSampleConsumer
-     * (org.apache.jmeter.report.processor.SampleConsumer)
-     */
     @Override
     public void addSampleConsumer(SampleConsumer consumer) {
         producer.addSampleConsumer(consumer);
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see
-     * org.apache.jmeter.report.processor.AbstractSampleSource#removeSampleConsumer
-     * (org.apache.jmeter.report.processor.SampleConsumer)
-     */
     @Override
     public void removeSampleConsumer(SampleConsumer consumer) {
         producer.removeSampleConsumer(consumer);
@@ -246,20 +227,20 @@ public class CsvFileSampleSource extends AbstractSampleSource {
          * @param consumers list of consumers for the samples (must not be
          *                  {@code null})
          */
-        public void setSampleConsumers(List<SampleConsumer> consumers) {
-            Validate.notNull(consumers, "consumers must not be null");
+        private void setSampleConsumers(List<SampleConsumer> consumers) {
+            Objects.requireNonNull(consumers, "consumers must not be null");
 
             this.sampleConsumers = consumers;
         }
 
-        public void addSampleConsumer(SampleConsumer consumer) {
+        private void addSampleConsumer(SampleConsumer consumer) {
             if (consumer == null) {
                 return;
             }
             this.sampleConsumers.add(consumer);
         }
 
-        public void removeSampleConsumer(SampleConsumer consumer) {
+        private void removeSampleConsumer(SampleConsumer consumer) {
             if (consumer == null) {
                 return;
             }

@@ -180,8 +180,8 @@ public class Sample implements Serializable, Comparable<Sample> {
 
     @Override
     public boolean equals(Object o){
-        return (o instanceof Sample) &&
-                (this.compareTo((Sample) o) == 0);
+        return (o instanceof Sample sample) &&
+                (this.compareTo(sample) == 0);
     }
 
     @Override
@@ -208,7 +208,7 @@ public class Sample implements Serializable, Comparable<Sample> {
      * @return the start time using the specified format
      * Intended for use from Functors
      */
-    @SuppressWarnings("JdkObsolete")
+    @SuppressWarnings("JavaUtilDate")
     public String getStartTimeFormatted(Format format) {
         return format.format(new Date(getStartTime()));
     }

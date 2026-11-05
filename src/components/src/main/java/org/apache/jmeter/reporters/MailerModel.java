@@ -35,10 +35,10 @@ import javax.mail.internet.MimeMessage;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.samplers.SampleResult;
 import org.apache.jmeter.testelement.AbstractTestElement;
 import org.apache.jmeter.util.JMeterUtils;
+import org.apache.jorphan.util.StringUtilities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -281,7 +281,7 @@ public class MailerModel extends AbstractTestElement implements Serializable {
      * @param from
      *            the sender of the mail as shown in the mail-client.
      * @param vEmails
-     *            all receivers of the mail. The receivers are seperated by
+     *            all receivers of the mail. The receivers are separated by
      *            commas.
      * @param subject
      *            the subject of the mail.
@@ -305,7 +305,7 @@ public class MailerModel extends AbstractTestElement implements Serializable {
      * @param from
      *            the sender of the mail as shown in the mail-client.
      * @param vEmails
-     *            all receivers of the mail. The receivers are seperated by
+     *            all receivers of the mail. The receivers are separated by
      *            commas.
      * @param subject
      *            the subject of the mail.
@@ -345,22 +345,18 @@ public class MailerModel extends AbstractTestElement implements Serializable {
         if(mailAuthType != MailAuthType.NONE) {
             props.put(MAIL_SMTP_AUTH, "true");
             switch (mailAuthType) {
-                case SSL:
+                case SSL -> {
                     props.put(MAIL_SMTP_SOCKETFACTORY_CLASS,
                             "javax.net.ssl.SSLSocketFactory");
                     props.put(MAIL_SMTP_CHECK_SERVER_IDENTITY, true);
-                    break;
-                case TLS:
-                    props.put(MAIL_SMTP_STARTTLS,
-                            "true");
-                    break;
-
-                default:
-                    break;
                 }
+                case TLS -> props.put(MAIL_SMTP_STARTTLS, "true");
+                default -> {
+                }
+            }
         }
 
-        if(!StringUtils.isEmpty(user)) {
+        if (StringUtilities.isNotEmpty(user)) {
             authenticator =
                     new javax.mail.Authenticator() {
                         @Override
@@ -425,7 +421,7 @@ public class MailerModel extends AbstractTestElement implements Serializable {
     }
 
     public void setSmtpPort(String value) {
-        if(StringUtils.isEmpty(value)) {
+        if (StringUtilities.isEmpty(value)) {
             value = DEFAULT_SMTP_PORT;
         }
         setProperty(PORT_KEY, value, DEFAULT_SMTP_PORT);

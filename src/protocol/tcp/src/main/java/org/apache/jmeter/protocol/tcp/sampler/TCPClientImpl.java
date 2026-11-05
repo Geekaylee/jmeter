@@ -21,11 +21,12 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.samplers.SampleResult;
 import org.apache.jmeter.util.JMeterUtils;
+import org.apache.jorphan.util.StringUtilities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,7 +52,7 @@ public class TCPClientImpl extends AbstractTCPClient {
         }
         setCharset(CHARSET);
         String configuredCharset = JMeterUtils.getProperty("tcp.charset");
-        if(StringUtils.isEmpty(configuredCharset)) {
+        if (StringUtilities.isEmpty(configuredCharset)) {
             log.info("Using platform default charset:{}",CHARSET);
         } else {
             log.info("Using charset:{}", configuredCharset);
@@ -115,15 +116,25 @@ public class TCPClientImpl extends AbstractTCPClient {
 
             // do we need to close byte array (or flush it?)
             if(log.isDebugEnabled()) {
-                log.debug("Read: {}\n{}", w.size(), w.toString());
+                log.debug("Read: {}\n{}", w.size(), w.toString(CHARSET));
             }
             return w.toString(CHARSET);
+        } catch (UnsupportedEncodingException e) {
+            throw new ReadException("Error decoding bytes from server with " + CHARSET + ", bytes read: " + w.size(),
+                    e, "<Read bytes with bad encoding>");
         } catch (IOException e) {
-            throw new ReadException("Error reading from server, bytes read: " + w.size(), e, w.toString());
+            String decodedBytes;
+            try {
+                decodedBytes = w.toString(CHARSET);
+            } catch (UnsupportedEncodingException uee) {
+                // we should never get here, as it would have crashed earlier
+                decodedBytes = "<Read bytes with bad encoding>";
+            }
+            throw new ReadException("Error reading from server, bytes read: " + w.size(), e, decodedBytes);
         }
     }
 
-    private String showEOL(final String input) {
+    private static String showEOL(final String input) {
         StringBuilder sb = new StringBuilder(input.length()*2);
         for(int i=0; i < input.length(); i++) {
             char ch = input.charAt(i);

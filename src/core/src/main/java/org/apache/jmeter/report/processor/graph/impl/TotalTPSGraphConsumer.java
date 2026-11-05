@@ -46,13 +46,6 @@ public class TotalTPSGraphConsumer extends AbstractOverTimeGraphConsumer {
     private static final String TRANSACTION_SUCCESS_LABEL = String.format(STATUS_SERIES_FORMAT, "Transaction", SUCCESS_SERIES_SUFFIX);
     private static final String TRANSACTION_FAILURE_LABEL = String.format(STATUS_SERIES_FORMAT, "Transaction", FAILURE_SERIES_SUFFIX);
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see
-     * org.apache.jmeter.report.csv.processor.impl.AbstractOverTimeGraphConsumer
-     * #createTimeStampKeysSelector()
-     */
     @Override
     protected TimeStampKeysSelector createTimeStampKeysSelector() {
         TimeStampKeysSelector keysSelector = new TimeStampKeysSelector();
@@ -60,12 +53,6 @@ public class TotalTPSGraphConsumer extends AbstractOverTimeGraphConsumer {
         return keysSelector;
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see org.apache.jmeter.report.csv.processor.impl.AbstractGraphConsumer#
-     * createGroupInfos()
-     */
     @Override
     protected Map<String, GroupInfo> createGroupInfos() {
         AbstractSeriesSelector seriesSelector = new AbstractSeriesSelector(true) {
@@ -80,18 +67,6 @@ public class TotalTPSGraphConsumer extends AbstractOverTimeGraphConsumer {
                         new TimeRateAggregatorFactory(), seriesSelector,
                         // We include Transaction Controller results
                         new CountValueSelector(false), false, false));
-    }
-
-    /*
-     * (non-Javadoc)
-     *
-     * @see
-     * org.apache.jmeter.report.csv.processor.impl.AbstractOverTimeGraphConsumer
-     * #setGranularity(long)
-     */
-    @Override
-    public void setGranularity(long granularity) {
-        super.setGranularity(granularity);
     }
 
     @Override

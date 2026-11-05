@@ -42,7 +42,6 @@ import javax.swing.JTable;
 import javax.swing.JViewport;
 import javax.swing.ListSelectionModel;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.config.Argument;
 import org.apache.jmeter.config.Arguments;
 import org.apache.jmeter.gui.TestElementMetadata;
@@ -53,6 +52,7 @@ import org.apache.jmeter.util.JMeterUtils;
 import org.apache.jorphan.gui.GuiUtils;
 import org.apache.jorphan.gui.ObjectTableModel;
 import org.apache.jorphan.reflect.Functor;
+import org.apache.jorphan.util.StringUtilities;
 
 /**
  * A GUI panel allowing the user to enter name-value argument pairs. These
@@ -66,7 +66,7 @@ public class ArgumentsPanel extends AbstractConfigGui implements ActionListener 
     private static final long serialVersionUID = 241L;
 
     /** The title label for this component. */
-    private JLabel tableLabel;
+    private final JLabel tableLabel;
 
     /** The table containing the list of arguments. */
     private transient JTable table;
@@ -85,7 +85,7 @@ public class ArgumentsPanel extends AbstractConfigGui implements ActionListener 
     /**
      * Added background support for reporting tool
      */
-    private Color background;
+    private final Color background;
 
     /**
      * Boolean indicating whether this component is a standalone component or it
@@ -108,7 +108,7 @@ public class ArgumentsPanel extends AbstractConfigGui implements ActionListener 
     /** Disable buttons :Detail, Add, Add from Clipboard, Delete, Up and Down*/
     private final boolean disableButtons;
 
-    private final Function<String[], Argument> argCreator;
+    private final Function<String[], ? extends Argument> argCreator;
 
     /** Command for adding a row to the table. */
     private static final String ADD = "add"; // $NON-NLS-1$
@@ -250,7 +250,7 @@ public class ArgumentsPanel extends AbstractConfigGui implements ActionListener 
      * @param argCreator function to create {@link Argument}s from Strings taken from clipboard
      */
     public ArgumentsPanel(String label, Color bkg, boolean enableUpDown, boolean standalone, ObjectTableModel model,
-            boolean disableButtons, Function<String[], Argument> argCreator) {
+            boolean disableButtons, Function<String[], ? extends Argument> argCreator) {
         tableLabel = new JLabel(label);
         this.enableUpDown = enableUpDown;
         this.disableButtons = disableButtons;
@@ -293,14 +293,13 @@ public class ArgumentsPanel extends AbstractConfigGui implements ActionListener 
     @Override
     public void modifyTestElement(TestElement args) {
         GuiUtils.stopTableEditing(table);
-        if (args instanceof Arguments) {
-            Arguments arguments = (Arguments) args;
+        if (args instanceof Arguments arguments) {
             arguments.clear();
             @SuppressWarnings("unchecked") // only contains Argument (or HTTPArgument)
             Iterator<Argument> modelData = (Iterator<Argument>) tableModel.iterator();
             while (modelData.hasNext()) {
                 Argument arg = modelData.next();
-                if(StringUtils.isEmpty(arg.getName()) && StringUtils.isEmpty(arg.getValue())) {
+                if (StringUtilities.isEmpty(arg.getName()) && StringUtilities.isEmpty(arg.getValue())) {
                     continue;
                 }
                 arg.setMetaData("="); // $NON-NLS-1$
@@ -321,9 +320,9 @@ public class ArgumentsPanel extends AbstractConfigGui implements ActionListener 
     @Override
     public void configure(TestElement el) {
         super.configure(el);
-        if (el instanceof Arguments) {
+        if (el instanceof Arguments arguments) {
             tableModel.clearData();
-            for (JMeterProperty jMeterProperty : (Arguments) el) {
+            for (JMeterProperty jMeterProperty : arguments) {
                 Argument arg = (Argument) jMeterProperty.getObjectValue();
                 tableModel.addRow(arg);
             }

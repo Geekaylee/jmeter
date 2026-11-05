@@ -17,7 +17,8 @@
 
 package org.apache.jmeter.report.processor;
 
-import org.apache.commons.lang3.Validate;
+import java.util.Objects;
+
 import org.apache.jmeter.report.core.Sample;
 import org.apache.jmeter.report.core.SampleSelector;
 
@@ -29,13 +30,11 @@ import org.apache.jmeter.report.core.SampleSelector;
  */
 public class AggregateConsumer extends AbstractSampleConsumer {
 
-    private static final String MUST_NOT_BE_NULL = "%s must not be null";
-
     /** The aggregator. */
-    private Aggregator aggregator;
+    private final Aggregator aggregator;
 
     /** The selector. */
-    private SampleSelector<Double> selector;
+    private final SampleSelector<Double> selector;
 
     /**
      * Gets the aggregator.
@@ -65,18 +64,13 @@ public class AggregateConsumer extends AbstractSampleConsumer {
      */
     public AggregateConsumer(Aggregator aggregator,
             SampleSelector<Double> selector) {
-        Validate.notNull(aggregator, MUST_NOT_BE_NULL, "aggregator");
-        Validate.notNull(selector, MUST_NOT_BE_NULL, "selector");
+        Objects.requireNonNull(aggregator, "aggregator must not be null");
+        Objects.requireNonNull(selector, "selector must not be null");
 
         this.aggregator = aggregator;
         this.selector = selector;
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see org.apache.jmeter.report.processor.SampleConsumer#startConsuming()
-     */
     @Override
     public void startConsuming() {
         // Broadcast metadata to consumes for each channel
@@ -88,24 +82,12 @@ public class AggregateConsumer extends AbstractSampleConsumer {
         super.startProducing();
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see
-     * org.apache.jmeter.report.processor.SampleConsumer#consume(org.apache.
-     * jmeter.report.core.Sample, int)
-     */
     @Override
     public void consume(Sample sample, int channel) {
         aggregator.addValue(selector.select(sample));
         super.produce(sample, channel);
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see org.apache.jmeter.report.processor.SampleConsumer#stopConsuming()
-     */
     @Override
     public void stopConsuming() {
         setDataToContext(getName(), new ValueResultData(aggregator.getResult()));

@@ -68,7 +68,7 @@ public class StatisticsSummaryConsumer extends
      * @param data {@link StatisticsSummaryData}
      * @param isOverall boolean indicating if aggregation concerns the Overall results in which case we ignore Transaction Controller's SampleResult
      */
-    private void aggregateSample(Sample sample, StatisticsSummaryData data, boolean isOverall) {
+    private static void aggregateSample(Sample sample, StatisticsSummaryData data, boolean isOverall) {
         if(isOverall && sample.isController()) {
             return;
         }
@@ -81,11 +81,11 @@ public class StatisticsSummaryConsumer extends
         }
 
         long elapsedTime = sample.getElapsedTime();
-        data.getPercentile1().addValue(elapsedTime);
-        data.getPercentile2().addValue(elapsedTime);
-        data.getPercentile3().addValue(elapsedTime);
-        data.getMean().addValue(elapsedTime);
-        data.getMedian().addValue(elapsedTime);
+        data.getPercentile1().addValue((double) elapsedTime);
+        data.getPercentile2().addValue((double) elapsedTime);
+        data.getPercentile3().addValue((double) elapsedTime);
+        data.getMean().addValue((double) elapsedTime);
+        data.getMedian().addValue((double) elapsedTime);
         data.setMin(elapsedTime);
         data.setMax(elapsedTime);
 
@@ -94,14 +94,6 @@ public class StatisticsSummaryConsumer extends
         data.setEndTime(sample.getEndTime());
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see
-     * org.apache.jmeter.report.processor.AbstractSummaryConsumer#updateData
-     * (org.apache.jmeter.report.processor.AbstractSummaryConsumer.SummaryInfo,
-     * org.apache.jmeter.report.core.Sample)
-     */
     @Override
     protected void updateData(SummaryInfo info, Sample sample) {
         SummaryInfo overallInfo = getOverallInfo();
@@ -125,13 +117,6 @@ public class StatisticsSummaryConsumer extends
         }
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see
-     * org.apache.jmeter.report.processor.AbstractSummaryConsumer#createDataResult
-     * (java.lang.String)
-     */
     @Override
     protected ListResultData createDataResult(String key,
             StatisticsSummaryData data) {
@@ -156,25 +141,11 @@ public class StatisticsSummaryConsumer extends
         return result;
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see
-     * org.apache.jmeter.report.processor.AbstractSummaryConsumer#getKeyFromSample
-     * (org.apache.jmeter.report.core.Sample)
-     */
     @Override
     protected String getKeyFromSample(Sample sample) {
         return sample.getName();
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see
-     * org.apache.jmeter.report.processor.AbstractSummaryConsumer#createResultTitles
-     * ()
-     */
     @Override
     protected ListResultData createResultTitles() {
         ListResultData titles = new ListResultData();
@@ -201,7 +172,7 @@ public class StatisticsSummaryConsumer extends
         return titles;
     }
 
-    private String formatPercentile(String percentileLabel) {
+    private static String formatPercentile(String percentileLabel) {
         return String.format(JMeterUtils.getResString("reportgenerator_summary_statistics_percentile_fmt"),
                 percentileLabel);
     }

@@ -16,33 +16,38 @@
  */
 
 import com.github.vlsi.gradle.properties.dsl.props
-import java.time.Duration
 import org.apache.jmeter.buildtools.batchtest.BatchTest
 import org.apache.jmeter.buildtools.batchtest.BatchTestServer
+import java.time.Duration
 
 plugins {
-    jmeterbuild.batchtest
+    id("java-test-fixtures")
+    id("build-logic.batchtest")
     id("com.github.vlsi.gradle-extensions")
+    id("build-logic.jvm-library")
 }
 
 val extraTestDependencies by configurations.creating
 val loggingClasspath by configurations.creating
 
 dependencies {
-    api(project(":src:dist"))
-    testImplementation(project(":src:dist", "allTestClasses"))
-    testImplementation("org.apache.commons:commons-lang3") {
-        because("StringUtils")
-    }
-    testImplementation("commons-io:commons-io") {
-        because("IOUtils")
-    }
+    api(projects.src.dist)
+
+    testImplementation(testFixtures(projects.src.core))
+    testImplementation(testFixtures(projects.src.components))
     testImplementation("com.fasterxml.jackson.core:jackson-databind") {
         because("It is used in ReportGeneratorSpec and HtmlReportGeneratorSpec")
     }
+    testImplementation("org.apache.santuario:xmlsec:4.0.4") {
+        because("XML canonicalization for comparing XML in tests")
+    }
+    testImplementation("org.eclipse.jgit:org.eclipse.jgit:7.8.0.202609011348-r") {
+        because("Histogram diff for readable XML comparison output in tests")
+    }
 
-    extraTestDependencies(platform(project(":src:bom")))
-    extraTestDependencies("org.hsqldb:hsqldb")
+    extraTestDependencies(platform(projects.src.bomThirdparty))
+    extraTestDependencies(platform(projects.src.bomTesting))
+    extraTestDependencies("org.hsqldb:hsqldb::jdk8")
     extraTestDependencies("org.apache.mina:mina-core")
     extraTestDependencies("org.apache.ftpserver:ftplet-api")
     extraTestDependencies("org.apache.ftpserver:ftpserver-core")
@@ -60,12 +65,12 @@ dependencies {
     // This is not required for regular ./bin/jmeter because activemq/mina is not on the top-level
     // classpath but all the jars are loaded by a custom classloader which is instantiated by NewDriver
     // TODO: implement "extra classpath folder" in DynamicClassLoader
-    loggingClasspath(platform(project(":src:bom")))
+    loggingClasspath(platform(projects.src.bomThirdparty))
     loggingClasspath("org.slf4j:jcl-over-slf4j")
     loggingClasspath("org.apache.logging.log4j:log4j-api")
     loggingClasspath("org.apache.logging.log4j:log4j-core")
     loggingClasspath("org.apache.logging.log4j:log4j-1.2-api")
-    loggingClasspath("org.apache.logging.log4j:log4j-slf4j-impl")
+    loggingClasspath("org.apache.logging.log4j:log4j-slf4j2-impl")
 }
 
 val libOpt = copySpec {
@@ -77,8 +82,12 @@ val populateLibs by tasks.registering {
     doLast {
         val deps = extraTestDependencies.resolvedConfiguration.resolvedArtifacts
         with(libOpt) {
-            fileMode = "644".toInt(8)
-            dirMode = "755".toInt(8)
+            filePermissions {
+                unix("rw-r--r--")
+            }
+            dirPermissions {
+                unix("rwxr-xr-x")
+            }
             from(deps.map { it.file })
         }
     }
@@ -90,7 +99,7 @@ libOpt.from(populateLibs)
 // For now lib/opt is hard-coded in some of the JMX files
 val extraTestJarsDir = rootProject.layout.projectDirectory.dir("lib").dir("opt")
 
-val createDist by project(":src:dist").tasks.existing(Task::class)
+val createDist = ":src:dist:createDist"
 
 val copyExtraTestLibs by tasks.registering(Sync::class) {
     dependsOn(createDist)
@@ -107,7 +116,7 @@ val detailBatchTasks = findProperty("allBatch") is String
 val batchTests by tasks.registering() {
     group = LifecycleBasePlugin.VERIFICATION_GROUP
     description = "Executes all the batch tests" +
-            if (detailBatchTasks) "" else " (add -PallBatch to see individual batch tasks)"
+        if (detailBatchTasks) "" else " (add -PallBatch to see individual batch tasks)"
 }
 
 val jacoco = project.extensions.findByType<JacocoPluginExtension>()
@@ -117,8 +126,11 @@ inline fun <reified T : BatchTest> createBatchTask(
     suffix: String = "",
     noinline action: (T.() -> Unit)? = null
 ) =
-    tasks.register("batch" + (if (T::class == BatchTestServer::class) "Server" else "") +
-            name.capitalize() + suffix.capitalize(), T::class) {
+    tasks.register(
+        "batch" + (if (T::class == BatchTestServer::class) "Server" else "") +
+            name.replaceFirstChar { it.titlecaseChar() } + suffix.replaceFirstChar { it.titlecaseChar() },
+        T::class
+    ) {
         group = when {
             detailBatchTasks -> LifecycleBasePlugin.VERIFICATION_GROUP
             else -> ""
@@ -219,7 +231,8 @@ val batchTestServerStartupTimeoutDuration =
         } catch (e: Exception) {
             throw IllegalArgumentException(
                 "Unable to parse the value of batchTestServerStartupTimeout property as duration $it." +
-                        " Please ensure it follows java.time.Duration format (e.g. PT5S)", e
+                    " Please ensure it follows java.time.Duration format (e.g. PT5S)",
+                e
             )
         }
     }
@@ -228,10 +241,12 @@ createBatchServerTestTask("BatchTestLocal") {
     batchTestServerStartupTimeoutDuration?.let { startupTimeout.set(it) }
 }
 
-tasks.named(JavaPlugin.TEST_TASK_NAME).configure {
+tasks.test {
     // Test examine JAR contents in /lib/..., so we need to copy jars to the projectRoot/lib/
     dependsOn(createDist)
-    // This is a convenience, so batch tests are executed as a part of default "test" task
+}
+
+tasks.check {
     dependsOn(batchTests)
 }
 

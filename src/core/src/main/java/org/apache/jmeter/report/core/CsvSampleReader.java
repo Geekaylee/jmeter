@@ -28,8 +28,8 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.jmeter.samplers.SampleEvent;
 import org.apache.jmeter.samplers.SampleSaveConfiguration;
 import org.apache.jmeter.save.CSVSaveService;
@@ -61,19 +61,19 @@ public class CsvSampleReader implements Closeable{
                             SampleSaveConfiguration.DEFAULT_DELIMITER))
                     .charAt(0);
 
-    private File file;
+    private final File file;
     private InputStream fis;
     private Reader isr;
     private BufferedReader reader;
-    private char separator;
+    private final char separator;
     private long row;
-    private SampleMetadata metadata;
-    private int columnCount;
+    private final SampleMetadata metadata;
+    private final int columnCount;
     private Sample lastSampleRead;
     /**
      * Number of sample_variables if csv file has no header
      */
-    private int numberOfSampleVariablesInCsv;
+    private final int numberOfSampleVariablesInCsv;
 
     /**
      * Instantiates a new csv sample reader.
@@ -116,9 +116,9 @@ public class CsvSampleReader implements Closeable{
         }
         boolean usingHeadersInCsv = true;
         if (metadata == null) {
-            Pair<Boolean, SampleMetadata> localMd = readMetadata(separator, useSaveSampleCfg);
-            this.metadata = localMd.getRight();
-            usingHeadersInCsv = localMd.getLeft();
+            Map.Entry<Boolean, SampleMetadata> localMd = readMetadata(separator, useSaveSampleCfg);
+            this.metadata = localMd.getValue();
+            usingHeadersInCsv = localMd.getKey();
         } else {
             this.metadata = metadata;
         }
@@ -135,7 +135,7 @@ public class CsvSampleReader implements Closeable{
         this.lastSampleRead = nextSample();
     }
 
-    private Pair<Boolean, SampleMetadata> readMetadata(char separator, boolean useSaveSampleCfg) {
+    private Map.Entry<Boolean, SampleMetadata> readMetadata(char separator, boolean useSaveSampleCfg) {
         try {
             SampleMetadata result;
             // Read first line
@@ -150,18 +150,14 @@ public class CsvSampleReader implements Closeable{
                     && CSVSaveService.getSampleSaveConfiguration(
                             line, file.getAbsolutePath()) == null) {
                 // Build metadata from default save config
-                if (log.isWarnEnabled()) {
-                    log.warn(
-                            "File '{}' does not contain the field names header, "
-                                    + "ensure the jmeter.save.saveservice.* properties are the same "
-                                    + "as when the CSV file was created or the file may be read incorrectly "
-                                    + "when generating report",
-                            file.getAbsolutePath());
-                }
-                System.out.println("File '"+file.getAbsolutePath()+"' does not contain the field names header, "
+                String warnMessage = "File '" + file.getAbsolutePath() + "' does not contain the field names header, "
                         + "ensure the jmeter.save.saveservice.* properties are the same "
                         + "as when the CSV file was created or the file may be read incorrectly "
-                        + "when generating report");
+                        + "when generating report";
+                if (log.isWarnEnabled()) {
+                    log.warn(warnMessage);
+                }
+                System.out.println(warnMessage);
                 result = new SampleMetadata(
                         SampleSaveConfiguration.staticConfig());
 
@@ -170,7 +166,7 @@ public class CsvSampleReader implements Closeable{
                 result = new SampleMetaDataParser(separator).parse(line);
                 hasHeaders = true;
             }
-            return Pair.of(hasHeaders, result);
+            return Map.entry(hasHeaders, result);
         } catch (Exception e) {
             throw new SampleException("Could not read metadata !", e);
         }

@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.dbcp2.BasicDataSource;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.config.ConfigElement;
 import org.apache.jmeter.gui.TestElementMetadata;
 import org.apache.jmeter.testbeans.TestBean;
@@ -36,7 +35,7 @@ import org.apache.jmeter.testelement.AbstractTestElement;
 import org.apache.jmeter.testelement.TestStateListener;
 import org.apache.jmeter.threads.JMeterContextService;
 import org.apache.jmeter.threads.JMeterVariables;
-import org.apache.jorphan.util.JOrphanUtils;
+import org.apache.jorphan.util.StringUtilities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,7 +44,7 @@ public class DataSourceElement extends AbstractTestElement
     implements ConfigElement, TestStateListener, TestBean {
     private static final Logger log = LoggerFactory.getLogger(DataSourceElement.class);
 
-    private static final long serialVersionUID = 234L;
+    private static final long serialVersionUID = 235L;
 
     private transient String dataSource;
     private transient String driver;
@@ -60,16 +59,17 @@ public class DataSourceElement extends AbstractTestElement
     private transient String timeout;
     private transient String trimInterval;
     private transient String transactionIsolation;
+    private transient String poolPreparedStatements;
 
     private transient boolean keepAlive;
     private transient boolean autocommit;
     private transient boolean preinit;
 
-    /*
+    /**
      *  The datasource is set up by testStarted and cleared by testEnded.
      *  These are called from different threads, so access must be synchronized.
      *  The same instance is called in each case.
-    */
+     */
     private transient BasicDataSource dbcpDataSource;
 
     // Keep a record of the pre-thread pools so that they can be disposed of at the end of a test
@@ -114,13 +114,13 @@ public class DataSourceElement extends AbstractTestElement
         TestBeanHelper.prepare(this);
         JMeterVariables variables = getThreadContext().getVariables();
         String poolName = getDataSource();
-        if (JOrphanUtils.isBlank(poolName)) {
-            throw new IllegalArgumentException("Name for DataSoure must not be empty in " + getName());
+        if (StringUtilities.isBlank(poolName)) {
+            throw new IllegalArgumentException("Name for DataSource must not be empty in " + getName());
         } else if (variables.getObject(poolName) != null) {
             log.error("JDBC data source already defined for: {}", poolName);
         } else {
             String maxPool = getPoolMax();
-            perThreadPoolSet = Collections.synchronizedSet(new HashSet<BasicDataSource>());
+            perThreadPoolSet = Collections.synchronizedSet(new HashSet<>());
             if (maxPool.equals("0")){ // i.e. if we want per thread pooling
                 variables.putObject(poolName, new DataSourceComponentImpl()); // pool will be created later
             } else {
@@ -163,8 +163,7 @@ public class DataSourceElement extends AbstractTestElement
     public static String getConnectionInfo(String poolName) throws SQLException{
         Object poolObject =
                 JMeterContextService.getContext().getVariables().getObject(poolName);
-        if (poolObject instanceof DataSourceComponentImpl) {
-            DataSourceComponentImpl pool = (DataSourceComponentImpl) poolObject;
+        if (poolObject instanceof DataSourceComponentImpl pool) {
             return pool.getConnectionInfo();
         } else {
             return "Object:" + poolName + " is not of expected type '" + DataSourceComponentImpl.class.getName() + "'";
@@ -193,8 +192,7 @@ public class DataSourceElement extends AbstractTestElement
         if (poolObject == null) {
             throw new SQLException("No pool found named: '" + poolName + "', ensure Variable Name matches Variable Name of JDBC Connection Configuration");
         } else {
-            if(poolObject instanceof DataSourceComponentImpl) {
-                DataSourceComponentImpl pool = (DataSourceComponentImpl) poolObject;
+            if(poolObject instanceof DataSourceComponentImpl pool) {
                 return pool.getConnection();
             } else {
                 String errorMsg = "Found object stored under variable:'" + poolName + "' with class:"
@@ -206,39 +204,38 @@ public class DataSourceElement extends AbstractTestElement
         }
     }
 
-    /*
+    /*/
      * Set up the DataSource - maxPool is a parameter, so the same code can
      * also be used for setting up the per-thread pools.
-    */
+     */
     private BasicDataSource initPool(String maxPool) {
         BasicDataSource dataSource = new BasicDataSource();
 
         if (log.isDebugEnabled()) {
-            StringBuilder sb = new StringBuilder(40);
-            sb.append("MaxPool: ");
-            sb.append(maxPool);
-            sb.append(" Timeout: ");
-            sb.append(getTimeout());
-            sb.append(" TrimInt: ");
-            sb.append(getTrimInterval());
-            sb.append(" Auto-Commit: ");
-            sb.append(isAutocommit());
-            sb.append(" Preinit: ");
-            sb.append(isPreinit());
-            log.debug(sb.toString());
+            log.debug("MaxPool: {} Timeout: {} TrimInt: {} Auto-Commit: {} Preinit: {} poolPreparedStatements: {}",
+                    maxPool, getTimeout(), getTrimInterval(), isAutocommit(), isPreinit(), poolPreparedStatements);
         }
         int poolSize = Integer.parseInt(maxPool);
         dataSource.setMinIdle(0);
         dataSource.setInitialSize(poolSize);
         dataSource.setAutoCommitOnReturn(false);
-        if(StringUtils.isNotEmpty(initQuery)) {
+        if (StringUtilities.isNotEmpty(initQuery)) {
             String[] sqls = initQuery.split("\n");
             dataSource.setConnectionInitSqls(Arrays.asList(sqls));
         } else {
             dataSource.setConnectionInitSqls(Collections.emptyList());
         }
-        if(StringUtils.isNotEmpty(connectionProperties)) {
+        if (StringUtilities.isNotEmpty(connectionProperties)) {
             dataSource.setConnectionProperties(connectionProperties);
+        }
+        if (StringUtilities.isNotEmpty(poolPreparedStatements)) {
+            int maxPreparedStatements = Integer.parseInt(poolPreparedStatements);
+            if (maxPreparedStatements < 0) {
+                dataSource.setPoolPreparedStatements(false);
+            } else {
+                dataSource.setPoolPreparedStatements(true);
+                dataSource.setMaxOpenPreparedStatements(10);
+            }
         }
         dataSource.setRollbackOnReturn(false);
         dataSource.setMaxIdle(poolSize);
@@ -265,7 +262,7 @@ public class DataSourceElement extends AbstractTestElement
         if(isKeepAlive()) {
             dataSource.setTestWhileIdle(true);
             String validationQuery = getCheckQuery();
-            if (StringUtils.isBlank(validationQuery)) {
+            if (StringUtilities.isBlank(validationQuery)) {
                 dataSource.setValidationQuery(null);
             } else {
                 dataSource.setValidationQuery(validationQuery);
@@ -293,7 +290,7 @@ public class DataSourceElement extends AbstractTestElement
         dataSource.setDriverClassName(getDriver());
         dataSource.setUrl(getDbUrl());
 
-        if (_username.length() > 0){
+        if (!_username.isEmpty()){
             dataSource.setUsername(_username);
             dataSource.setPassword(getPassword());
         }
@@ -343,7 +340,7 @@ public class DataSourceElement extends AbstractTestElement
         /**
          * @return String connection information
          */
-        public String getConnectionInfo() {
+        private String getConnectionInfo() {
             BasicDataSource dsc = getConfiguredDataSource();
             StringBuilder builder = new StringBuilder(100);
             builder.append("shared:").append(sharedDSC != null)
@@ -357,7 +354,7 @@ public class DataSourceElement extends AbstractTestElement
          * @return Connection
          * @throws SQLException if database access error occurred
          */
-        public Connection getConnection() throws SQLException {
+        private Connection getConnection() throws SQLException {
             BasicDataSource dsc = getConfiguredDataSource();
             Connection conn=dsc.getConnection();
             int isolation = DataSourceElementBeanInfo.getTransactionIsolationMode(getTransactionIsolation());
@@ -642,5 +639,25 @@ public class DataSourceElement extends AbstractTestElement
      */
     public void setConnectionProperties(String connectionProperties) {
         this.connectionProperties = connectionProperties;
+    }
+
+    /**
+     * Return the max number of pooled prepared statements. "0" means no limit
+     * on prepared statements to pool and "-1" disables pooling.
+     *
+     * @return the max number of pooled prepared statements
+     */
+    public String getPoolPreparedStatements() {
+        return poolPreparedStatements;
+    }
+
+    /**
+     * Set the max number of pooled prepared statements. "0" means no limit
+     * on prepared statements to pool and "-1" disables pooling.
+     *
+     * @param poolPreparedStatements max number of prepared statements
+     */
+    public void setPoolPreparedStatements(String poolPreparedStatements) {
+        this.poolPreparedStatements = poolPreparedStatements;
     }
 }

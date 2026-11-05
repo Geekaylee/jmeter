@@ -18,6 +18,7 @@
 package org.apache.jmeter.protocol.http.control;
 
 import java.net.URL;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -72,7 +73,7 @@ public class HC4CookieHandler implements CookieHandler {
 
     private static final PublicSuffixMatcher publicSuffixMatcher = PublicSuffixMatcherLoader.getDefault();
     @SuppressWarnings("deprecation")
-    private static Registry<CookieSpecProvider> registry  =
+    private static final Registry<CookieSpecProvider> registry  =
             RegistryBuilder.<CookieSpecProvider>create()
             // case is ignored bug registry as it converts to lowerCase(Locale.US)
             .register(CookieSpecs.BEST_MATCH, new DefaultCookieSpecProvider(publicSuffixMatcher))
@@ -104,7 +105,7 @@ public class HC4CookieHandler implements CookieHandler {
     }
 
     @Override
-    @SuppressWarnings("JdkObsolete")
+    @SuppressWarnings("JavaUtilDate")
     public void addCookieFromHeader(CookieManager cookieManager,
             boolean checkCookies, String cookieHeader, URL url) {
             boolean debugEnabled = log.isDebugEnabled();
@@ -228,7 +229,14 @@ public class HC4CookieHandler implements CookieHandler {
         CookieOrigin cookieOrigin = new CookieOrigin(host, port, path, secure);
 
         List<org.apache.http.cookie.Cookie> cookiesValid = new ArrayList<>();
+        // #6428 Cookies must not be sent after they reached their expiry time.
+        // The cookie specs used here do not check the expiry date in match(),
+        // so expired cookies have to be filtered out explicitly.
+        Date now = Date.from(Instant.now());
         for (org.apache.http.cookie.Cookie cookie : cookies) {
+            if (cookie.isExpired(now)) {
+                continue;
+            }
             if (cookieSpec.match(cookie, cookieOrigin)) {
                 cookiesValid.add(cookie);
             }
@@ -240,8 +248,8 @@ public class HC4CookieHandler implements CookieHandler {
     /**
      * Create an HttpClient cookie from a JMeter cookie
      */
-    @SuppressWarnings("JdkObsolete")
-    private org.apache.http.cookie.Cookie makeCookie(Cookie jmc) {
+    @SuppressWarnings("JavaUtilDate")
+    private static org.apache.http.cookie.Cookie makeCookie(Cookie jmc) {
         long exp = jmc.getExpiresMillis();
         BasicClientCookie ret = new BasicClientCookie(jmc.getName(),
                 jmc.getValue());

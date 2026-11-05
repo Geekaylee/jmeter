@@ -20,6 +20,7 @@ package org.apache.jmeter.functions;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 
 import org.apache.jmeter.engine.util.CompoundVariable;
 import org.apache.jmeter.samplers.SampleResult;
@@ -28,6 +29,8 @@ import org.apache.jmeter.util.JMeterUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
+
+import com.google.auto.service.AutoService;
 
 /**
  * <p>
@@ -45,6 +48,7 @@ import org.slf4j.event.Level;
  * Returns: - the input string
  * @since 2.2
  */
+@AutoService(Function.class)
 public class LogFunction extends AbstractFunction {
     private static final Logger log = LoggerFactory.getLogger(LogFunction.class);
 
@@ -82,7 +86,7 @@ public class LogFunction extends AbstractFunction {
         String priorityString;
         if (values.length > 1) { // We have a default
             priorityString = ((CompoundVariable) values[1]).execute();
-            if (priorityString.length() == 0) {
+            if (priorityString.isEmpty()) {
                 priorityString = DEFAULT_PRIORITY;
             }
         } else {
@@ -92,7 +96,7 @@ public class LogFunction extends AbstractFunction {
         Throwable t = null;
         if (values.length > 2) { // Throwable wanted
             String value = ((CompoundVariable) values[2]).execute();
-            if (value.length() > 0) {
+            if (!value.isEmpty()) {
                 t = new Throwable(value);
             }
         }
@@ -115,7 +119,7 @@ public class LogFunction extends AbstractFunction {
         StringBuilder sb = new StringBuilder(80);
         sb.append("Log: ");
         sb.append(tn);
-        if (c.length()>0) {
+        if (!c.isEmpty()) {
             sb.append(' ');
             sb.append(c);
         } else {
@@ -141,7 +145,7 @@ public class LogFunction extends AbstractFunction {
      */
     static synchronized void logDetails(Logger logger, String stringToLog, String priorityString, Throwable throwable,
             String comment) {
-        String prio = priorityString.trim().toUpperCase();
+        String prio = priorityString.trim().toUpperCase(Locale.ROOT);
 
         if ("OUT".equals(prio)) {//$NON-NLS-1
             printDetails(System.out, stringToLog, throwable, comment);
@@ -160,23 +164,11 @@ public class LogFunction extends AbstractFunction {
             final String separator = comment.isEmpty() ? DEFAULT_SEPARATOR : comment;
 
             switch (prioLevel) {
-                case ERROR:
-                    logger.error("{} {} {}", threadName, separator, stringToLog, throwable);
-                    break;
-                case WARN:
-                    logger.warn("{} {} {}", threadName, separator, stringToLog, throwable);
-                    break;
-                case INFO:
-                    logger.info("{} {} {}", threadName, separator, stringToLog, throwable);
-                    break;
-                case DEBUG:
-                    logger.debug("{} {} {}", threadName, separator, stringToLog, throwable);
-                    break;
-                case TRACE:
-                    logger.trace("{} {} {}", threadName, separator, stringToLog, throwable);
-                    break;
-                default:
-                    throw new IllegalStateException("Invalid log level");
+                case ERROR -> logger.error("{} {} {}", threadName, separator, stringToLog, throwable);
+                case WARN -> logger.warn("{} {} {}", threadName, separator, stringToLog, throwable);
+                case INFO -> logger.info("{} {} {}", threadName, separator, stringToLog, throwable);
+                case DEBUG -> logger.debug("{} {} {}", threadName, separator, stringToLog, throwable);
+                case TRACE -> logger.trace("{} {} {}", threadName, separator, stringToLog, throwable);
             }
         }
     }

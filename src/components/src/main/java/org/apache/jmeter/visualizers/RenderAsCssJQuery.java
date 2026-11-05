@@ -37,7 +37,6 @@ import javax.swing.JTextArea;
 import javax.swing.border.Border;
 import javax.swing.border.EmptyBorder;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.extractor.Extractor;
 import org.apache.jmeter.extractor.HtmlExtractor;
 import org.apache.jmeter.gui.util.JSyntaxTextArea;
@@ -47,12 +46,16 @@ import org.apache.jmeter.util.JMeterUtils;
 import org.apache.jorphan.gui.GuiUtils;
 import org.apache.jorphan.gui.JLabeledChoice;
 import org.apache.jorphan.gui.JLabeledTextField;
+import org.apache.jorphan.util.StringUtilities;
 import org.fife.ui.rsyntaxtextarea.SyntaxConstants;
+
+import com.google.auto.service.AutoService;
 
 /**
  * Implement ResultsRender for CSS/JQuery tester
  * @since 2.10
  */
+@AutoService(ResultRenderer.class)
 public class RenderAsCssJQuery implements ResultRenderer, ActionListener {
 
     private static final String CSSJQUEY_TESTER_COMMAND = "cssjquery_tester"; // $NON-NLS-1$
@@ -98,7 +101,7 @@ public class RenderAsCssJQuery implements ResultRenderer, ActionListener {
     public void actionPerformed(ActionEvent e) {
         String command = e.getActionCommand();
         String cssJqueryDataFieldText = cssJqueryDataField.getText();
-        if (StringUtils.isNotEmpty(cssJqueryDataFieldText) && CSSJQUEY_TESTER_COMMAND.equals(command)) {
+        if (StringUtilities.isNotEmpty(cssJqueryDataFieldText) && CSSJQUEY_TESTER_COMMAND.equals(command)) {
             executeAndShowCssJqueryTester(cssJqueryDataFieldText);
         }
     }
@@ -108,8 +111,8 @@ public class RenderAsCssJQuery implements ResultRenderer, ActionListener {
      * @param textToParse
      */
     private void executeAndShowCssJqueryTester(String textToParse) {
-        if (textToParse != null && textToParse.length() > 0
-                && this.cssJqueryField.getText().length() > 0) {
+        if (StringUtilities.isNotEmpty(textToParse)
+                && !this.cssJqueryField.getText().isEmpty()) {
             this.cssJqueryResultField.setText(process(textToParse));
             this.cssJqueryResultField.setCaretPosition(0); // go to first line
         }
@@ -145,6 +148,7 @@ public class RenderAsCssJQuery implements ResultRenderer, ActionListener {
    public void renderResult(SampleResult sampleResult) {
        clearData();
         String response = ViewResultsFullVisualizer.getResponseAsString(sampleResult);
+        response = ViewResultsFullVisualizer.wrapLongLines(response);
         cssJqueryDataField.setText(response);
         cssJqueryDataField.setCaretPosition(0);
     }

@@ -27,6 +27,8 @@ import org.apache.jmeter.samplers.Sampler;
 import org.apache.jmeter.threads.JMeterVariables;
 import org.apache.jmeter.util.JMeterUtils;
 
+import com.google.auto.service.AutoService;
+
 /**
  * Function to get a JMeter property, and optionally store it
  *
@@ -41,6 +43,7 @@ import org.apache.jmeter.util.JMeterUtils;
  * - the property name itself
  * @since 2.0
  */
+@AutoService(Function.class)
 public class Property extends AbstractFunction {
 
     private static final List<String> desc = new ArrayList<>();
@@ -74,7 +77,7 @@ public class Property extends AbstractFunction {
         String propertyValue = JMeterUtils.getPropDefault(propertyName, propertyDefault);
         if (values.length > 1) {
             String variableName = ((CompoundVariable) values[1]).execute();
-            if (variableName.length() > 0) {// Allow for empty name
+            if (!variableName.isEmpty()) {// Allow for empty name
                 final JMeterVariables variables = getVariables();
                 if (variables != null) {
                     variables.put(variableName, propertyValue);

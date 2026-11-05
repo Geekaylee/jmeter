@@ -25,9 +25,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
 import javax.swing.ImageIcon;
@@ -40,7 +38,6 @@ import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 
-import org.apache.jmeter.gui.action.ActionNames;
 import org.apache.jmeter.gui.action.HtmlReportGenerator;
 import org.apache.jmeter.gui.util.EscapeDialog;
 import org.apache.jmeter.gui.util.JMeterToolBar;
@@ -52,7 +49,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class HtmlReportUI implements ActionListener {
-    private static Set<String> commands = new HashSet<>();
     private static final Logger LOGGER = LoggerFactory.getLogger(HtmlReportUI.class);
 
     private static final String CREATE_REQUEST = "CREATE_REQUEST";
@@ -81,11 +77,6 @@ public class HtmlReportUI implements ActionListener {
     private final ImageIcon runningIcon = JMeterUtils.getImage(IMAGES_PREFIX + iconSize +"/task-recurring.png");// $NON-NLS-1$
     private final ImageIcon inErrorIcon = JMeterUtils.getImage(IMAGES_PREFIX + iconSize +"/dialog-error-5.png");// $NON-NLS-1$
     private final ImageIcon completedIcon = JMeterUtils.getImage(IMAGES_PREFIX + iconSize +"/task-complete.png");// $NON-NLS-1$
-
-
-    static {
-        commands.add(ActionNames.HTML_REPORT);
-    }
 
     public HtmlReportUI() {
         super();
@@ -166,9 +157,9 @@ public class HtmlReportUI implements ActionListener {
     }
 
     private class ReportGenerationWorker extends SwingWorker<List<String>, String> {
-        private JButton reportLaunchButton;
+        private final JButton reportLaunchButton;
 
-        public ReportGenerationWorker(JButton reportLaunchButton) {
+        private ReportGenerationWorker(JButton reportLaunchButton) {
             this.reportLaunchButton = reportLaunchButton;
         }
         @Override
@@ -205,36 +196,32 @@ public class HtmlReportUI implements ActionListener {
     @Override
     public void actionPerformed(ActionEvent e) {
         switch (e.getActionCommand()) {
-        case CREATE_REQUEST:
-            try {
-                reportArea.setText(GENERATING_REPORT_LABEL + "\n");
-                reportLaunchButton.setIcon(runningIcon);
-                new ReportGenerationWorker(reportLaunchButton).execute();
-            } catch (Exception exception) {
-                if (LOGGER.isErrorEnabled()) {
-                    LOGGER.error("Error during html report generation: {}", exception.getMessage(), exception);
+            case CREATE_REQUEST -> {
+                try {
+                    reportArea.setText(GENERATING_REPORT_LABEL + "\n");
+                    reportLaunchButton.setIcon(runningIcon);
+                    new ReportGenerationWorker(reportLaunchButton).execute();
+                } catch (Exception exception) {
+                    if (LOGGER.isErrorEnabled()) {
+                        LOGGER.error("Error during html report generation: {}", exception.getMessage(), exception);
+                    }
+                }
+                if (LOGGER.isDebugEnabled()) {
+                    LOGGER.debug("CSV file path {}\nuser.properties file path: {}\nOutput directory file path: {}",
+                            csvFilePathTextField.getText(), userPropertiesFilePathTextField.getText(),
+                            outputDirectoryPathTextField.getText());
                 }
             }
-            if (LOGGER.isDebugEnabled()) {
-                LOGGER.debug("CSV file path {}\nuser.properties file path: {}\nOutput directory file path: {}",
-                        csvFilePathTextField.getText(), userPropertiesFilePathTextField.getText(),
-                        outputDirectoryPathTextField.getText());
-            }
-            break;
-        case BROWSE_USER_PROPERTIES:
-            userPropertiesFilePathTextField.setText(showFileChooser(userPropertiesFileButton.getParent(),
-                    userPropertiesFilePathTextField, false, new String[] { ".properties" }));
-            break;
-        case BROWSE_CSV:
-            csvFilePathTextField.setText(showFileChooser(csvFileButton.getParent(), csvFilePathTextField, false,
-                    new String[] { ".jtl", ".csv" }));
-            break;
-        case BROWSE_OUTPUT:
-            outputDirectoryPathTextField.setText(
+            case BROWSE_USER_PROPERTIES ->
+                    userPropertiesFilePathTextField.setText(showFileChooser(userPropertiesFileButton.getParent(),
+                            userPropertiesFilePathTextField, false, new String[]{".properties"}));
+            case BROWSE_CSV ->
+                    csvFilePathTextField.setText(showFileChooser(csvFileButton.getParent(), csvFilePathTextField, false,
+                            new String[]{".jtl", ".csv"}));
+            case BROWSE_OUTPUT -> outputDirectoryPathTextField.setText(
                     showFileChooser(outputDirectoryButton.getParent(), outputDirectoryPathTextField, true, null));
-            break;
-        default:
-            break;
+            default -> {
+            }
         }
     }
 

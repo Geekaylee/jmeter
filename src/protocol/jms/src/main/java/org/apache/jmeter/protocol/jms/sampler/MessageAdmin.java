@@ -21,10 +21,10 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 
-import javax.jms.Message;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import jakarta.jms.Message;
 
 
 /**
@@ -48,11 +48,12 @@ public class MessageAdmin {
             this.reply = reply;
         }
 
-        public Object getReply() {
+        private Object getReply() {
             return reply;
         }
 
-        public Object getRequest() {
+        @SuppressWarnings("UnusedMethod")
+        private Object getRequest() {
             return request;
         }
 
@@ -68,7 +69,7 @@ public class MessageAdmin {
         /**
          * @return the latch
          */
-        public CountDownLatch getLatch() {
+        private CountDownLatch getLatch() {
             return latch;
         }
     }

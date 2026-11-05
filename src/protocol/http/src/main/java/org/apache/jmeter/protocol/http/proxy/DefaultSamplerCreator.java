@@ -22,16 +22,18 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.file.Files;
 import java.text.MessageFormat;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import javax.xml.XMLConstants;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.config.Arguments;
 import org.apache.jmeter.protocol.http.config.GraphQLRequestParams;
 import org.apache.jmeter.protocol.http.config.MultipartUrlConfig;
@@ -41,12 +43,12 @@ import org.apache.jmeter.protocol.http.control.gui.GraphQLHTTPSamplerGui;
 import org.apache.jmeter.protocol.http.control.gui.HttpTestSampleGui;
 import org.apache.jmeter.protocol.http.sampler.HTTPSamplerBase;
 import org.apache.jmeter.protocol.http.sampler.HTTPSamplerFactory;
-import org.apache.jmeter.protocol.http.sampler.PostWriter;
 import org.apache.jmeter.protocol.http.util.ConversionUtils;
 import org.apache.jmeter.protocol.http.util.GraphQLRequestParamUtils;
 import org.apache.jmeter.protocol.http.util.HTTPConstants;
 import org.apache.jmeter.protocol.http.util.HTTPFileArg;
 import org.apache.jmeter.testelement.TestElement;
+import org.apache.jorphan.util.StringUtilities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xml.sax.InputSource;
@@ -56,11 +58,15 @@ import org.xml.sax.XMLReader;
 import org.xml.sax.helpers.DefaultHandler;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.StreamReadFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.google.auto.service.AutoService;
 
 /**
  * Default implementation that handles classical HTTP textual + Multipart requests
  */
+@AutoService(SamplerCreator.class)
 public class DefaultSamplerCreator extends AbstractSamplerCreator {
     private static final Logger log = LoggerFactory.getLogger(DefaultSamplerCreator.class);
 
@@ -72,7 +78,10 @@ public class DefaultSamplerCreator extends AbstractSamplerCreator {
     private static final int SAMPLER_NAME_NAMING_MODE_SUFFIX = 2; // $NON-NLS-1$
     private static final int SAMPLER_NAME_NAMING_MODE_FORMATTER = 3; // $NON_NLS-1$
 
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final ObjectMapper OBJECT_MAPPER = JsonMapper.builder()
+            // See https://github.com/FasterXML/jackson-core/issues/991
+            .enable(StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION)
+            .build();
     /**
      *
      */
@@ -127,7 +136,7 @@ public class DefaultSamplerCreator extends AbstractSamplerCreator {
             log.debug("sampler path = {}", sampler.getPath());
         }
         Arguments arguments = sampler.getArguments();
-        if(arguments.getArgumentCount() == 1 && arguments.getArgument(0).getName().length()==0) {
+        if(arguments.getArgumentCount() == 1 && arguments.getArgument(0).getName().isEmpty()) {
             sampler.setPostBodyRaw(true);
         }
 
@@ -136,7 +145,7 @@ public class DefaultSamplerCreator extends AbstractSamplerCreator {
         }
     }
 
-    private void detectAndModifySamplerOnGraphQLRequest(final HTTPSamplerBase sampler, final HttpRequestHdr request) {
+    private static void detectAndModifySamplerOnGraphQLRequest(final HTTPSamplerBase sampler, final HttpRequestHdr request) {
         final String method = request.getMethod();
         final Header header = request.getHeaderManager().getFirstHeaderNamed("Content-Type");
         final boolean graphQLContentType = header != null
@@ -165,9 +174,9 @@ public class DefaultSamplerCreator extends AbstractSamplerCreator {
 
         if (params != null) {
             sampler.setProperty(TestElement.GUI_CLASS, GraphQLHTTPSamplerGui.class.getName());
-            sampler.setProperty(GraphQLUrlConfigGui.OPERATION_NAME, params.getOperationName());
-            sampler.setProperty(GraphQLUrlConfigGui.QUERY, params.getQuery());
-            sampler.setProperty(GraphQLUrlConfigGui.VARIABLES, params.getVariables());
+            sampler.setProperty(GraphQLUrlConfigGui.OPERATION_NAME, StringUtilities.trimToNull(params.getOperationName()));
+            sampler.setProperty(GraphQLUrlConfigGui.QUERY, StringUtilities.trimToNull(params.getQuery()));
+            sampler.setProperty(GraphQLUrlConfigGui.VARIABLES, StringUtilities.trimToNull(params.getVariables()));
         }
     }
 
@@ -214,24 +223,10 @@ public class DefaultSamplerCreator extends AbstractSamplerCreator {
             final String contentType = request.getContentType();
             MultipartUrlConfig urlConfig = request.getMultipartConfig(contentType);
             String contentEncoding = sampler.getContentEncoding();
+            log.debug("Using encoding {} for request body", contentEncoding);
+
             // Get the post data using the content encoding of the request
-            String postData = null;
-            if (log.isDebugEnabled()) {
-                if(!StringUtils.isEmpty(contentEncoding)) {
-                    log.debug("Using encoding {} for request body", contentEncoding);
-                }
-                else {
-                    log.debug("No encoding found, using JRE default encoding for request body");
-                }
-            }
-
-
-            if (!StringUtils.isEmpty(contentEncoding)) {
-                postData = new String(request.getRawPostData(), contentEncoding);
-            } else {
-                // Use default encoding
-                postData = new String(request.getRawPostData(), PostWriter.ENCODING);
-            }
+            String postData = new String(request.getRawPostData(), contentEncoding);
 
             if (urlConfig != null) {
                 urlConfig.parseArguments(postData);
@@ -262,12 +257,12 @@ public class DefaultSamplerCreator extends AbstractSamplerCreator {
                 // We also assume this if no content type is present, to be most backwards compatible,
                 // but maybe we should only parse arguments if the content type is as expected
                 sampler.parseArguments(postData.trim(), contentEncoding); //standard name=value postData
-            } else if (postData.length() > 0) {
+            } else if (!postData.isEmpty()) {
                 if (isBinaryContent(contentType)) {
                     try {
                         File tempDir = new File(getBinaryDirectory());
                         File out = File.createTempFile(request.getMethod(), getBinaryFileSuffix(), tempDir);
-                        FileUtils.writeByteArrayToFile(out,request.getRawPostData());
+                        Files.write(out.toPath(), request.getRawPostData());
                         HTTPFileArg [] files = {new HTTPFileArg(out.getPath(),"",contentType)};
                         sampler.setHTTPFiles(files);
                     } catch (IOException e) {
@@ -324,20 +319,11 @@ public class DefaultSamplerCreator extends AbstractSamplerCreator {
 
     private static final class ErrorDetectionHandler extends DefaultHandler {
         private boolean errorDetected = false;
-        public ErrorDetectionHandler() {
-            super();
-        }
-        /* (non-Javadoc)
-         * @see org.xml.sax.helpers.DefaultHandler#error(org.xml.sax.SAXParseException)
-         */
         @Override
         public void error(SAXParseException e) throws SAXException {
             this.errorDetected = true;
         }
 
-        /* (non-Javadoc)
-         * @see org.xml.sax.helpers.DefaultHandler#fatalError(org.xml.sax.SAXParseException)
-         */
         @Override
         public void fatalError(SAXParseException e) throws SAXException {
             this.errorDetected = true;
@@ -345,7 +331,7 @@ public class DefaultSamplerCreator extends AbstractSamplerCreator {
         /**
          * @return the errorDetected
          */
-        public boolean isErrorDetected() {
+        private boolean isErrorDetected() {
             return errorDetected;
         }
     }
@@ -354,23 +340,49 @@ public class DefaultSamplerCreator extends AbstractSamplerCreator {
      * @param sampler {@link HTTPSamplerBase}
      * @param request {@link HttpRequestHdr}
      */
-    protected void computeSamplerName(HTTPSamplerBase sampler,
+    protected static void computeSamplerName(HTTPSamplerBase sampler,
             HttpRequestHdr request) {
-        String prefix = StringUtils.defaultString(request.getPrefix(), "");
+        String prefix = Objects.toString(request.getPrefix(), "");
         int httpSampleNameMode = request.getHttpSampleNameMode();
         String format = getFormat(httpSampleNameMode, request.getHttpSampleNameFormat());
-        if (!HTTPConstants.CONNECT.equals(request.getMethod()) && isNumberRequests()) {
-            sampler.setName(MessageFormat.format(format, prefix, sampler.getPath(), incrementRequestNumberAndGet()));
-        } else {
-            sampler.setName(MessageFormat.format(format, prefix, sampler.getPath()));
+        String url;
+        try {
+            url = sampler.getUrl().toString();
+        } catch (MalformedURLException e) {
+            // If path could not be converted to URL, retain path component
+            url = sampler.getPath();
+            log.warn("Could not get URL to name sample", e);
         }
+        List<Object> values = Arrays.asList(
+                prefix,
+                sampler.getPath(),
+                sampler.getMethod(),
+                sampler.getDomain(),
+                sampler.getProtocol(),
+                sampler.getPort(),
+                url
+        );
+        Object[] valuesArray;
+        if (!HTTPConstants.CONNECT.equals(request.getMethod()) && isNumberRequests()) {
+            valuesArray = values.toArray(new Object[values.size() + 1]);
+            valuesArray[values.size()] = incrementRequestNumberAndGet();
+        } else {
+            valuesArray = values.toArray();
+        }
+        sampler.setName(MessageFormat.format(format,valuesArray));
     }
 
-    private String getFormat(int httpSampleNameMode, String format) {
+    private static String getFormat(int httpSampleNameMode, String format) {
         if (httpSampleNameMode == SAMPLER_NAME_NAMING_MODE_FORMATTER) {
-            return format.replaceAll("#\\{name([,}])", "{0$1")
+            return format.replaceAll("\\{(\\d+(,[^}]*)?)\\}", "'{'$1'}'")
+                    .replaceAll("#\\{name([,}])", "{0$1")
                     .replaceAll("#\\{path([,}])", "{1$1")
-                    .replaceAll("#\\{counter([,}])", "{2$1");
+                    .replaceAll("#\\{method([,}])", "{2$1")
+                    .replaceAll("#\\{host([,}])", "{3$1")
+                    .replaceAll("#\\{scheme([,}])", "{4$1")
+                    .replaceAll("#\\{port([,}])", "{5$1")
+                    .replaceAll("#\\{url([,}])", "{6$1")
+                    .replaceAll("#\\{counter([,}])", "{7$1");
         }
         if (isNumberRequests()) {
             return getNumberedFormat(httpSampleNameMode);
@@ -387,15 +399,15 @@ public class DefaultSamplerCreator extends AbstractSamplerCreator {
         return "{1}";
     }
 
-    private String getNumberedFormat(int httpSampleNameMode) {
+    private static String getNumberedFormat(int httpSampleNameMode) {
         if (httpSampleNameMode == SAMPLER_NAME_NAMING_MODE_PREFIX) {
-            return "{0}{1}-{2}";
+            return "{0}{1}-{7}";
         }
         if (httpSampleNameMode == SAMPLER_NAME_NAMING_MODE_COMPLETE) {
-            return "{0}-{2}";
+            return "{0}-{7}";
         }
         if (httpSampleNameMode == SAMPLER_NAME_NAMING_MODE_SUFFIX) {
-            return "{0}-{2} {1}";
+            return "{0}-{7} {1}";
         }
         return "{1}";
     }
@@ -406,18 +418,9 @@ public class DefaultSamplerCreator extends AbstractSamplerCreator {
      * @param request {@link HttpRequestHdr}
      */
     protected void computePath(HTTPSamplerBase sampler, HttpRequestHdr request) {
-        if(sampler.getContentEncoding() != null) {
-            sampler.setPath(request.getPath(), sampler.getContentEncoding());
-        }
-        else {
-            // Although the spec says UTF-8 should be used for encoding URL parameters,
-            // most browser use ISO-8859-1 for default if encoding is not known.
-            // We use null for contentEncoding, then the url parameters will be added
-            // with the value in the URL, and the "encode?" flag set to false
-            sampler.setPath(request.getPath(), null);
-        }
+        sampler.setPath(request.getPath(), sampler.getContentEncoding());
         if (log.isDebugEnabled()) {
-            log.debug("Proxy: setting path: {}", sampler.getPath());
+            log.debug("Proxy: finished setting path: {}", sampler.getPath());
         }
     }
 
@@ -448,7 +451,7 @@ public class DefaultSamplerCreator extends AbstractSamplerCreator {
                 formEncodings, urlWithoutQuery);
 
         // Set the content encoding
-        if(!StringUtils.isEmpty(contentEncoding)) {
+        if (StringUtilities.isNotEmpty(contentEncoding)) {
             sampler.setContentEncoding(contentEncoding);
         }
     }

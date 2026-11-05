@@ -19,6 +19,7 @@ package org.apache.jmeter.util;
 
 import java.io.Serializable;
 
+import org.apache.jmeter.samplers.SampleResult;
 import org.apache.jmeter.testelement.AbstractTestElement;
 import org.apache.jmeter.testelement.TestStateListener;
 import org.apache.jmeter.testelement.ThreadListener;
@@ -74,11 +75,7 @@ public abstract class BeanShellTestElement extends AbstractTestElement
      */
     protected BeanShellInterpreter getBeanShellInterpreter() {
         if (isResetInterpreter()) {
-            try {
-                bshInterpreter.reset();
-            } catch (ClassNotFoundException e) {
-                log.error("Cannot reset BeanShell: {}", e.toString()); // NOSONAR last arg would be exception
-            }
+            bshInterpreter.reset();
         }
 
         JMeterContext jmctx = JMeterContextService.getContext();
@@ -100,13 +97,9 @@ public abstract class BeanShellTestElement extends AbstractTestElement
         parameters=""; // ensure variables are not null
         filename="";
         script="";
-        try {
-            String initFileName = JMeterUtils.getProperty(getInitFileProperty());
-            hasInitFile = initFileName != null;
-            bshInterpreter = new BeanShellInterpreter(initFileName, log);
-        } catch (ClassNotFoundException e) {
-            log.error("Cannot find BeanShell: {}", e.toString()); // NOSONAR last arg would be exception
-        }
+        String initFileName = JMeterUtils.getProperty(getInitFileProperty());
+        hasInitFile = initFileName != null;
+        bshInterpreter = new BeanShellInterpreter(initFileName, log);
     }
 
     protected Object readResolve() {
@@ -130,12 +123,31 @@ public abstract class BeanShellTestElement extends AbstractTestElement
      * <li>Parameters</li>
      * <li>bsh.args</li>
      * </ul>
-     * @param bsh the interpreter, not {@code null}
-     * @return the result of the script, may be {@code null}
      *
+     * @param bsh          the interpreter, not {@code null}
+     * @return the result of the script, may be {@code null}
      * @throws JMeterException when working with the bsh fails
      */
-    protected Object processFileOrScript(BeanShellInterpreter bsh) throws JMeterException{
+    protected Object processFileOrScript(BeanShellInterpreter bsh) throws JMeterException {
+        return processFileOrScript(bsh, null);
+    }
+
+    /**
+     * Process the file or script from the test element.
+     * <p>
+     * Sets the following script variables:
+     * <ul>
+     * <li>FileName</li>
+     * <li>Parameters</li>
+     * <li>bsh.args</li>
+     * </ul>
+     *
+     * @param bsh          the interpreter, not {@code null}
+     * @param sampleResult sampler result to set {@code setSamplerData} or {@code null}
+     * @return the result of the script, may be {@code null}
+     * @throws JMeterException when working with the bsh fails
+     */
+    protected Object processFileOrScript(BeanShellInterpreter bsh, SampleResult sampleResult) throws JMeterException {
         String fileName = getFilename();
         String params = getParameters();
 
@@ -146,8 +158,15 @@ public abstract class BeanShellTestElement extends AbstractTestElement
         bsh.set("bsh.args",//$NON-NLS-1$
                 JOrphanUtils.split(params, " "));//$NON-NLS-1$
 
-        if (fileName.length() == 0) {
-            return bsh.eval(getScript());
+        if (fileName.isEmpty()) {
+            String bshScript = getScript();
+            if (sampleResult != null) {
+                sampleResult.setSamplerData(bshScript);
+            }
+            return bsh.eval(bshScript);
+        }
+        if (sampleResult != null) {
+            sampleResult.setSamplerData(fileName);
         }
         return bsh.source(fileName);
     }

@@ -32,10 +32,13 @@ import org.apache.jmeter.util.JMeterUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.auto.service.AutoService;
+
 /**
  * A function which understands BeanShell
  * @since 1.X
  */
+@AutoService(Function.class)
 public class BeanShell extends AbstractFunction {
 
     private static final Logger log = LoggerFactory.getLogger(BeanShell.class);
@@ -100,7 +103,7 @@ public class BeanShell extends AbstractFunction {
             if (bshOut != null) {
                 resultStr = bshOut.toString();
             }
-            if (vars != null && varName.length() > 0) {// vars will be null on TestPlan
+            if (vars != null && !varName.isEmpty()) {// vars will be null on TestPlan
                 vars.put(varName, resultStr);
             }
         } catch (Exception ex) // Mainly for bsh.EvalError
@@ -112,9 +115,8 @@ public class BeanShell extends AbstractFunction {
 
     }
 
-    /*
+    /**
      * Helper method for use by scripts
-     *
      */
     public void log_info(String s) {
         log.info(s);
@@ -128,11 +130,7 @@ public class BeanShell extends AbstractFunction {
 
         values = parameters.toArray();
 
-        try {
-            bshInterpreter = new BeanShellInterpreter(JMeterUtils.getProperty(INIT_FILE), log);
-        } catch (ClassNotFoundException e) {
-            throw new InvalidVariableException("BeanShell not found", e);
-        }
+        bshInterpreter = new BeanShellInterpreter(JMeterUtils.getProperty(INIT_FILE), log);
     }
 
     /** {@inheritDoc} */

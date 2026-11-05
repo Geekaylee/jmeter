@@ -23,20 +23,20 @@ import javax.swing.BorderFactory;
 import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.config.Arguments;
 import org.apache.jmeter.gui.util.HorizontalPanel;
 import org.apache.jmeter.gui.util.JSyntaxTextArea;
 import org.apache.jmeter.gui.util.JTextScrollPane;
 import org.apache.jmeter.protocol.http.config.GraphQLRequestParams;
 import org.apache.jmeter.protocol.http.sampler.HTTPSamplerBase;
+import org.apache.jmeter.protocol.http.sampler.HTTPSamplerBaseSchema;
 import org.apache.jmeter.protocol.http.util.GraphQLRequestParamUtils;
 import org.apache.jmeter.protocol.http.util.HTTPArgument;
 import org.apache.jmeter.protocol.http.util.HTTPConstants;
 import org.apache.jmeter.testelement.TestElement;
-import org.apache.jmeter.testelement.property.TestElementProperty;
 import org.apache.jmeter.util.JMeterUtils;
 import org.apache.jorphan.gui.JLabeledTextField;
+import org.apache.jorphan.util.StringUtilities;
 
 /**
  * Extending {@link UrlConfigGui}, GraphQL over HTTP Request configuration GUI, providing more convenient UI elements
@@ -58,12 +58,6 @@ public class GraphQLUrlConfigGui extends UrlConfigGui {
     private static final UrlConfigDefaults URL_CONFIG_DEFAULTS = new UrlConfigDefaults();
     static {
         URL_CONFIG_DEFAULTS.setValidMethods(new String[] { HTTPConstants.POST, HTTPConstants.GET });
-        URL_CONFIG_DEFAULTS.setDefaultMethod(HTTPConstants.POST);
-        URL_CONFIG_DEFAULTS.setAutoRedirects(false);
-        URL_CONFIG_DEFAULTS.setFollowRedirects(false);
-        URL_CONFIG_DEFAULTS.setUseBrowserCompatibleMultipartMode(false);
-        URL_CONFIG_DEFAULTS.setUseKeepAlive(true);
-        URL_CONFIG_DEFAULTS.setUseMultipart(false);
         URL_CONFIG_DEFAULTS.setUseMultipartVisible(false);
     }
 
@@ -99,9 +93,11 @@ public class GraphQLUrlConfigGui extends UrlConfigGui {
         final GraphQLRequestParams params = new GraphQLRequestParams(operationNameText.getText(),
                 queryContent.getText(), variablesContent.getText());
 
-        element.setProperty(OPERATION_NAME, params.getOperationName());
-        element.setProperty(QUERY, params.getQuery());
-        element.setProperty(VARIABLES, params.getVariables());
+        String operationName = params.getOperationName();
+        element.setProperty(OPERATION_NAME, StringUtilities.trimToNull(operationName));
+        element.setProperty(QUERY, StringUtilities.trimToNull(params.getQuery()));
+        String variables = params.getVariables();
+        element.setProperty(VARIABLES, StringUtilities.trimToNull(variables));
         element.setProperty(HTTPSamplerBase.POST_BODY_RAW, !HTTPConstants.GET.equals(method));
 
         final Arguments args;
@@ -109,16 +105,16 @@ public class GraphQLUrlConfigGui extends UrlConfigGui {
         if (HTTPConstants.GET.equals(method)) {
             args = createHTTPArgumentsTestElement();
 
-            if (StringUtils.isNotBlank(params.getOperationName())) {
-                args.addArgument(createHTTPArgument("operationName", params.getOperationName().trim(), true));
+            if (StringUtilities.isNotBlank(operationName)) {
+                args.addArgument(createHTTPArgument("operationName", operationName.trim(), true));
             }
 
             args.addArgument(createHTTPArgument("query",
                     GraphQLRequestParamUtils.queryToGetParamValue(params.getQuery()), true));
 
-            if (StringUtils.isNotBlank(params.getVariables())) {
+            if (StringUtilities.isNotBlank(variables)) {
                 final String variablesParamValue = GraphQLRequestParamUtils
-                        .variablesToGetParamValue(params.getVariables());
+                        .variablesToGetParamValue(variables);
                 if (variablesParamValue != null) {
                     args.addArgument(createHTTPArgument("variables", variablesParamValue, true));
                 }
@@ -128,7 +124,7 @@ public class GraphQLUrlConfigGui extends UrlConfigGui {
             args.addArgument(createHTTPArgument("", GraphQLRequestParamUtils.toPostBodyString(params), false));
         }
 
-        element.setProperty(new TestElementProperty(HTTPSamplerBase.ARGUMENTS, args));
+        element.set(HTTPSamplerBaseSchema.INSTANCE.getArguments(), args);
     }
 
     @Override
@@ -176,7 +172,7 @@ public class GraphQLUrlConfigGui extends UrlConfigGui {
         return paramPanel;
     }
 
-    private HTTPArgument createHTTPArgument(final String name, final String value, final boolean alwaysEncoded) {
+    private static HTTPArgument createHTTPArgument(final String name, final String value, final boolean alwaysEncoded) {
         final HTTPArgument arg = new HTTPArgument(name, value);
         arg.setUseEquals(true);
         arg.setEnabled(true);

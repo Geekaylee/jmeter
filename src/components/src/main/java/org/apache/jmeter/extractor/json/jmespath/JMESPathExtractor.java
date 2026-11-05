@@ -25,7 +25,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.processor.PostProcessor;
 import org.apache.jmeter.samplers.SampleResult;
 import org.apache.jmeter.testelement.AbstractScopedTestElement;
@@ -33,12 +32,15 @@ import org.apache.jmeter.testelement.TestStateListener;
 import org.apache.jmeter.threads.JMeterContext;
 import org.apache.jmeter.threads.JMeterVariables;
 import org.apache.jmeter.util.JMeterUtils;
+import org.apache.jorphan.util.StringUtilities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.StreamReadFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 
 import io.burt.jmespath.Expression;
@@ -59,7 +61,10 @@ public class JMESPathExtractor extends AbstractScopedTestElement
     private static final String DEFAULT_VALUE = "JMESExtractor.defaultValue"; // $NON-NLS-1$
     private static final String MATCH_NUMBER = "JMESExtractor.matchNumber"; // $NON-NLS-1$
     private static final String REF_MATCH_NR = "_matchNr"; // $NON-NLS-1$
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    static final ObjectMapper OBJECT_MAPPER = JsonMapper.builder()
+            // See https://github.com/FasterXML/jackson-core/issues/991
+            .enable(StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION)
+            .build();
 
     @Override
     public void process() {
@@ -69,10 +74,11 @@ public class JMESPathExtractor extends AbstractScopedTestElement
         String refName = getRefName();
         String defaultValue = getDefaultValue();
         int matchNumber;
-        if (StringUtils.isBlank(getMatchNumber())) {
+        String matchNumberText = getMatchNumber();
+        if (StringUtilities.isBlank(matchNumberText)) {
             matchNumber = 0;
         } else {
-            matchNumber = Integer.parseInt(getMatchNumber());
+            matchNumber = Integer.parseInt(matchNumberText);
         }
         final String jsonPathExpression = getJmesPathExpression().trim();
         clearOldRefVars(vars, refName);
@@ -115,12 +121,12 @@ public class JMESPathExtractor extends AbstractScopedTestElement
         }
     }
 
-    private void handleSingleResult(JMeterVariables vars, String refName, int matchNumber, List<String> resultList) {
+    private static void handleSingleResult(JMeterVariables vars, String refName, int matchNumber, List<String> resultList) {
         String suffix = (matchNumber < 0) ? "_1" : "";
         placeObjectIntoVars(vars, refName + suffix, resultList, 0);
     }
 
-    private void handleListResult(JMeterVariables vars, String refName, String defaultValue, int matchNumber,
+    private static void handleListResult(JMeterVariables vars, String refName, String defaultValue, int matchNumber,
             List<String> resultList) {
         if (matchNumber < 0) {
             // Extract all
@@ -149,7 +155,7 @@ public class JMESPathExtractor extends AbstractScopedTestElement
         }
     }
 
-    private void handleNullResult(JMeterVariables vars, String refName, String defaultValue, int matchNumber) {
+    private static void handleNullResult(JMeterVariables vars, String refName, String defaultValue, int matchNumber) {
         vars.put(refName, defaultValue);
         vars.put(refName + REF_MATCH_NR, "0"); //$NON-NLS-1$
         if (matchNumber < 0) {
@@ -176,7 +182,7 @@ public class JMESPathExtractor extends AbstractScopedTestElement
             if (previousResult != null) {
                 List<String> results = getSampleList(previousResult).stream()
                         .map(SampleResult::getResponseDataAsString)
-                        .filter(StringUtils::isNotBlank)
+                        .filter(StringUtilities::isNotBlank)
                         .collect(Collectors.toList());
                 if (log.isDebugEnabled()) {
                     log.debug("JMESExtractor {} working on Responses: {}", getName(), results);
@@ -214,7 +220,7 @@ public class JMESPathExtractor extends AbstractScopedTestElement
         }
     }
 
-    private void placeObjectIntoVars(JMeterVariables vars, String refName, List<String> extractedValues, int matchNr) {
+    private static void placeObjectIntoVars(JMeterVariables vars, String refName, List<String> extractedValues, int matchNr) {
         vars.put(refName, extractedValues.get(matchNr));
     }
 

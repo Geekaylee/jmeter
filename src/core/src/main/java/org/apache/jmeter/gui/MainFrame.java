@@ -78,7 +78,6 @@ import javax.swing.tree.TreeCellRenderer;
 import javax.swing.tree.TreeModel;
 import javax.swing.tree.TreePath;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.gui.action.ActionNames;
 import org.apache.jmeter.gui.action.ActionRouter;
 import org.apache.jmeter.gui.action.KeyStrokes;
@@ -104,6 +103,7 @@ import org.apache.jmeter.util.JMeterUtils;
 import org.apache.jorphan.gui.ComponentUtil;
 import org.apache.jorphan.gui.JMeterUIDefaults;
 import org.apache.jorphan.util.JOrphanUtils;
+import org.apache.jorphan.util.StringUtilities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -187,12 +187,12 @@ public class MainFrame extends JFrame implements TestStateListener, Remoteable, 
     /** LogTarget that receives ERROR or FATAL */
     private transient ErrorsAndFatalsCounterLogTarget errorsAndFatalsCounterLogTarget;
 
-    private javax.swing.Timer computeTestDurationTimer = new javax.swing.Timer(1000,
+    private final javax.swing.Timer computeTestDurationTimer = new javax.swing.Timer(1000,
             this::computeTestDuration);
 
-    private AtomicInteger errorOrFatal = new AtomicInteger(0);
+    private final AtomicInteger errorOrFatal = new AtomicInteger(0);
 
-    private javax.swing.Timer refreshErrorsTimer = new javax.swing.Timer(1000,
+    private final javax.swing.Timer refreshErrorsTimer = new javax.swing.Timer(1000,
             this::refreshErrors);
 
     /**
@@ -256,6 +256,10 @@ public class MainFrame extends JFrame implements TestStateListener, Remoteable, 
                 }
                 JMeterUtils.refreshUI();
             }
+        });
+        addPropertyChangeListener("graphicsConfiguration", evt -> {
+            // Update UI when JMeter window moves to a different monitor as it might have different scaling settings
+            JMeterUtils.refreshUI();
         });
     }
 
@@ -404,8 +408,8 @@ public class MainFrame extends JFrame implements TestStateListener, Remoteable, 
         }
         stoppingMessage = new EscapeDialog(this, JMeterUtils.getResString("stopping_test_title"), true); //$NON-NLS-1$
         String label = JMeterUtils.getResString("stopping_test"); //$NON-NLS-1
-        if (!StringUtils.isEmpty(host)) {
-            label = label + JMeterUtils.getResString("stopping_test_host")+ ": " + host;
+        if (StringUtilities.isNotEmpty(host)) {
+            label = label + " " + JMeterUtils.getResString("stopping_test_host") + ": " + host;
         }
         JLabel stopLabel = new JLabel(label); //$NON-NLS-1$$NON-NLS-2$
         stopLabel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
@@ -627,7 +631,7 @@ public class MainFrame extends JFrame implements TestStateListener, Remoteable, 
      *
      * @return the main scroll pane
      */
-    private JScrollPane createMainPanel() {
+    private static JScrollPane createMainPanel() {
         return new JScrollPane();
     }
 
@@ -635,7 +639,7 @@ public class MainFrame extends JFrame implements TestStateListener, Remoteable, 
      * Create at the down of the left a Console for Log events
      * @return {@link LoggerPanel}
      */
-    private LoggerPanel createLoggerPanel() {
+    private static LoggerPanel createLoggerPanel() {
         LoggerPanel loggerPanel = new LoggerPanel();
         loggerPanel.setMinimumSize(new Dimension(0, 100));
         loggerPanel.setPreferredSize(new Dimension(0, 150));
@@ -665,12 +669,12 @@ public class MainFrame extends JFrame implements TestStateListener, Remoteable, 
                 TreePath path = this.getPathForLocation(event.getX(), event.getY());
                 if (path != null) {
                     Object treeNode = path.getLastPathComponent();
-                    if (treeNode instanceof DefaultMutableTreeNode) {
-                        Object testElement = ((DefaultMutableTreeNode) treeNode).getUserObject();
-                        if (testElement instanceof TestElement) {
-                            String comment = ((TestElement) testElement).getComment();
-                            if (StringUtils.isNotBlank(comment)) {
-                                return StringUtils.abbreviate(comment, 80);
+                    if (treeNode instanceof DefaultMutableTreeNode defaultMutableTreeNode) {
+                        Object testElement = defaultMutableTreeNode.getUserObject();
+                        if (testElement instanceof TestElement element) {
+                            String comment = element.getComment();
+                            if (StringUtilities.isNotBlank(comment)) {
+                                return comment.length() <= 80 ? comment : comment.substring(0, 77) + "...";
                             }
                         }
                     }
@@ -703,7 +707,7 @@ public class MainFrame extends JFrame implements TestStateListener, Remoteable, 
         return treevar;
     }
 
-    private void addQuickComponentHotkeys(JTree treevar) {
+    private static void addQuickComponentHotkeys(JTree treevar) {
         Action quickComponent = new QuickComponent("Quick Component");
 
         InputMap inputMap = treevar.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
@@ -722,7 +726,7 @@ public class MainFrame extends JFrame implements TestStateListener, Remoteable, 
      *
      * @return a renderer to draw the test tree nodes
      */
-    private TreeCellRenderer getCellRenderer() {
+    private static TreeCellRenderer getCellRenderer() {
         return new JMeterCellRenderer();
     }
 
@@ -763,18 +767,17 @@ public class MainFrame extends JFrame implements TestStateListener, Remoteable, 
             }
         }
 
-        /*
+        /**
          * Bug 62336: On Windows CTRL+6 doesn't give us an actionCommand, so
          * we have to try harder and read the KeyEvent from the EventQueue
          */
-        private String getCurrentKey(ActionEvent actionEvent) {
+        private static String getCurrentKey(ActionEvent actionEvent) {
             String actionCommand = actionEvent.getActionCommand();
             if (actionCommand != null) {
                 return actionCommand;
             }
             AWTEvent currentEvent = EventQueue.getCurrentEvent();
-            if (currentEvent instanceof KeyEvent) {
-                KeyEvent keyEvent = (KeyEvent) currentEvent;
+            if (currentEvent instanceof KeyEvent keyEvent) {
                 return KeyEvent.getKeyText(keyEvent.getKeyCode());
             }
             log.debug("No keycode could be found for this actionEvent {}", actionEvent);
@@ -904,7 +907,7 @@ public class MainFrame extends JFrame implements TestStateListener, Remoteable, 
     /**
      * Define AWT window title (WM_CLASS string) (useful on Gnome 3 / Linux)
      */
-    private void setWindowTitle() {
+    private static void setWindowTitle() {
         Class<?> xtoolkit = Toolkit.getDefaultToolkit().getClass();
         if (xtoolkit.getName().equals("sun.awt.X11.XToolkit")) { // NOSONAR (we don't want to depend on native LAF) $NON-NLS-1$
             try {
@@ -915,6 +918,14 @@ public class MainFrame extends JFrame implements TestStateListener, Remoteable, 
                 if (log.isWarnEnabled()) {
                     log.warn("Error awt title: {}", nsfe.toString()); // $NON-NLS-1$
                 }
+            } catch (RuntimeException e) {
+                // By default, strong encapsulation prevents setAccessible on java.desktop
+                if ("java.lang.reflect.InaccessibleObjectException".equals(e.getClass().getName())) {
+                    /* ignore */
+                    log.info("Unable to adjust awtAppClassName to {}", DEFAULT_APP_NAME);
+                    return;
+                }
+                throw e;
             }
         }
     }

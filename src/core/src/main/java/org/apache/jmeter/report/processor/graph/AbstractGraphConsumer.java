@@ -105,6 +105,7 @@ public abstract class AbstractGraphConsumer extends AbstractSampleConsumer {
      *
      * @return the group information
      */
+    @SuppressWarnings("NonApiType")
     protected final HashMap<String, GroupInfo> getGroupInfos() {
         return groupInfos;
     }
@@ -216,13 +217,13 @@ public abstract class AbstractGraphConsumer extends AbstractSampleConsumer {
 
     protected abstract Map<String, GroupInfo> createGroupInfos();
 
-    private void setMinResult(MapResultData result, String name, Double value) {
+    private static void setMinResult(MapResultData result, String name, Double value) {
         ValueResultData valueResult = (ValueResultData) result.getResult(name);
         valueResult.setValue(Math.min((Double) valueResult.getValue(),
                 value));
     }
 
-    private void setMaxResult(MapResultData result, String name, Double value) {
+    private static void setMaxResult(MapResultData result, String name, Double value) {
         ValueResultData valueResult = (ValueResultData) result.getResult(name);
         valueResult.setValue(Math.max((Double) valueResult.getValue(),
                 value));
@@ -313,7 +314,7 @@ public abstract class AbstractGraphConsumer extends AbstractSampleConsumer {
                 for (Map.Entry<Double, Aggregator> entry : sortedInfo
                         .entrySet()) {
                     Double value = entry.getKey();
-                    percent += (double) 100 * entry.getValue().getCount()
+                    percent += 100.0 * entry.getValue().getCount()
                             / count;
                     double percentile = (double) rank / 10;
                     while (percentile < percent) {
@@ -333,7 +334,7 @@ public abstract class AbstractGraphConsumer extends AbstractSampleConsumer {
                 for (Map.Entry<Double, Aggregator> entry : sortedInfo
                         .entrySet()) {
                     Double value = entry.getKey();
-                    percent += (double) 100 * entry.getValue().getCount()
+                    percent += 100.0 * entry.getValue().getCount()
                             / count;
                     double percentile = (double) rank / 10;
                     while (percentile < percent) {
@@ -375,8 +376,8 @@ public abstract class AbstractGraphConsumer extends AbstractSampleConsumer {
     /**
      * Aggregate a value to the aggregator defined by the specified parameters.
      */
-    private void aggregateValue(AggregatorFactory factory, SeriesData data,
-                                Double key, double value) {
+    private static void aggregateValue(AggregatorFactory factory, SeriesData data,
+                                       Double key, double value) {
         Map<Double, Aggregator> aggInfo = data.getAggregatorInfo();
 
         // Get or create aggregator
@@ -438,12 +439,6 @@ public abstract class AbstractGraphConsumer extends AbstractSampleConsumer {
      */
     protected abstract void initializeExtraResults(MapResultData parentResult);
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see
-     * org.apache.jmeter.report.csv.processor.SampleConsumer#startConsuming()
-     */
     @Override
     public void startConsuming() {
 
@@ -456,13 +451,6 @@ public abstract class AbstractGraphConsumer extends AbstractSampleConsumer {
         super.startProducing();
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see
-     * org.apache.jmeter.report.csv.processor.SampleConsumer#consume(org.apache
-     * .jmeter.report.csv.core.Sample, int)
-     */
     @Override
     public void consume(Sample sample, int channel) {
 
@@ -512,18 +500,6 @@ public abstract class AbstractGraphConsumer extends AbstractSampleConsumer {
         super.produce(sample, channel);
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see
-     * org.apache.jmeter.report.csv.processor.SampleConsumer#stopConsuming()
-     */
-    /*
-     * (non-Javadoc)
-     *
-     * @see
-     * org.apache.jmeter.report.processor.graph.SampleConsumer#stopConsuming()
-     */
     @Override
     public void stopConsuming() {
         super.stopProducing();

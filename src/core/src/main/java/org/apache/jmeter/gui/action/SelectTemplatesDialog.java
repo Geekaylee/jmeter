@@ -96,9 +96,9 @@ public class SelectTemplatesDialog extends JDialog implements ChangeListener, Ac
 
     private final JButton validateButton = new JButton();
 
-    private Map<String, JLabeledTextField> parametersTextFields = new LinkedHashMap<>();
+    private final Map<String, JLabeledTextField> parametersTextFields = new LinkedHashMap<>();
 
-    private JPanel actionBtnBar = new JPanel(new FlowLayout());
+    private final JPanel actionBtnBar = new JPanel(new FlowLayout());
 
     public SelectTemplatesDialog() {
         super((JFrame) null, JMeterUtils.getResString("template_title"), true); //$NON-NLS-1$
@@ -110,9 +110,6 @@ public class SelectTemplatesDialog extends JDialog implements ChangeListener, Ac
         JRootPane rootPane = new JRootPane();
         // Hide Window on ESC
         Action escapeAction = new AbstractAction("ESCAPE") { //$NON-NLS-1$
-            /**
-             *
-             */
             private static final long serialVersionUID = -6543764044868772971L;
 
             @Override
@@ -205,7 +202,7 @@ public class SelectTemplatesDialog extends JDialog implements ChangeListener, Ac
      * @param actionEvent {@link ActionEvent}
      * @return true if plan is not dirty or has been saved
      */
-    private boolean checkDirty(final ActionEvent actionEvent) {
+    private static boolean checkDirty(final ActionEvent actionEvent) {
         ActionRouter.getInstance().doActionNow(new ActionEvent(actionEvent.getSource(), actionEvent.getID(), ActionNames.CHECK_DIRTY));
         GuiPackage guiPackage = GuiPackage.getInstance();
         if (guiPackage.isDirty()) {
@@ -320,7 +317,7 @@ public class SelectTemplatesDialog extends JDialog implements ChangeListener, Ac
      * @param template {@link Template}
      * @return true if template has not parameter
      */
-    private boolean hasParameters(Template template) {
+    private static boolean hasParameters(Template template) {
         return !(template.getParameters() == null || template.getParameters().isEmpty());
     }
 
@@ -397,7 +394,7 @@ public class SelectTemplatesDialog extends JDialog implements ChangeListener, Ac
         return panel;
     }
 
-    private void initConstraints(GridBagConstraints gbc) {
+    private static void initConstraints(GridBagConstraints gbc) {
         gbc.anchor = GridBagConstraints.WEST;
         gbc.insets = new Insets(0,0,5,0);
         gbc.fill = GridBagConstraints.NONE;

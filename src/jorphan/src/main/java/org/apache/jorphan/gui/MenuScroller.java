@@ -55,8 +55,8 @@ public class MenuScroller {
 
     private JPopupMenu menu;
     private Component[] menuItems;
-    private MenuScrollItem upItem;
-    private MenuScrollItem downItem;
+    private final MenuScrollItem upItem;
+    private final MenuScrollItem downItem;
     private final MenuScrollListener menuListener = new MenuScrollListener();
     private final MouseWheelListener mouseWheelListener = new MouseScrollListener();
     private int scrollCount;
@@ -514,19 +514,6 @@ public class MenuScroller {
         }
     }
 
-    /**
-     * Ensures that the <code>dispose</code> method of this MenuScroller is
-     * called when there are no more references to it.
-     *
-     * @see MenuScroller#dispose()
-     */
-    @Override
-    @SuppressWarnings("deprecation")
-    public void finalize() throws Throwable {
-        dispose();
-        super.finalize();
-    }
-
     private void refreshMenu() {
         if (menuItems != null && menuItems.length > 0 && scrollCount <= menuItems.length) {
             firstIndex = Math.max(topFixedCount, firstIndex);
@@ -622,7 +609,7 @@ public class MenuScroller {
 
         private static final long serialVersionUID = 1;
 
-        public MenuScrollTimer(final int increment, int interval) {
+        private MenuScrollTimer(final int increment, int interval) {
             // Replacing with lambda causes
             // ClassFormatError: Illegal field name "org.apache.jorphan.gui.MenuScroller$this"
             // in class org/apache/jorphan/gui/MenuScroller$MenuScrollTimer
@@ -644,14 +631,14 @@ public class MenuScroller {
 
         private final MenuScrollTimer timer;
 
-        public MenuScrollItem(MenuIcon icon, int increment) {
+        private MenuScrollItem(MenuIcon icon, int increment) {
             setIcon(icon);
             setDisabledIcon(icon);
             timer = new MenuScrollTimer(increment, interval);
             addChangeListener(this);
         }
 
-        public void setInterval(int interval) {
+        private void setInterval(int interval) {
             timer.setDelay(interval);
         }
 

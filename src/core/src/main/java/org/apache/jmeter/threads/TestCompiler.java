@@ -18,12 +18,11 @@
 package org.apache.jmeter.threads;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
-import java.util.Map;
 import java.util.Set;
 
 import org.apache.jmeter.assertions.Assertion;
@@ -69,10 +68,10 @@ public class TestCompiler implements HashTreeTraverser {
     // TODO: replace with ArrayDequeue
     private final LinkedList<TestElement> stack = new LinkedList<>();
 
-    private final Map<Sampler, SamplePackage> samplerConfigMap = new HashMap<>();
+    private final IdentityHashMap<Sampler, SamplePackage> samplerConfigMap = new IdentityHashMap<>();
 
-    private final Map<TransactionController, SamplePackage> transactionControllerConfigMap =
-            new HashMap<>();
+    private final IdentityHashMap<TransactionController, SamplePackage> transactionControllerConfigMap =
+            new IdentityHashMap<>();
 
     private final HashTree testTree;
 
@@ -137,11 +136,11 @@ public class TestCompiler implements HashTreeTraverser {
         }
         TestElement child = stack.getLast();
         trackIterationListeners(stack);
-        if (child instanceof Sampler) {
-            saveSamplerConfigs((Sampler) child);
+        if (child instanceof Sampler sampler) {
+            saveSamplerConfigs(sampler);
         }
-        else if(child instanceof TransactionController) {
-            saveTransactionControllerConfigs((TransactionController) child);
+        else if(child instanceof TransactionController transactionController) {
+            saveTransactionControllerConfigs(transactionController);
         }
         stack.removeLast();
         if (!stack.isEmpty()) {
@@ -149,8 +148,7 @@ public class TestCompiler implements HashTreeTraverser {
             boolean duplicate = false;
             // Bug 53750: this condition used to be in ObjectPair#addTestElements()
             if (parent instanceof Controller && (child instanceof Sampler || child instanceof Controller)) {
-                if (parent instanceof TestCompilerHelper) {
-                    TestCompilerHelper te = (TestCompilerHelper) parent;
+                if (parent instanceof TestCompilerHelper te) {
                     duplicate = !te.addTestElementOnce(child);
                 } else { // this is only possible for 3rd party controllers by default
                     ObjectPair pair = new ObjectPair(child, parent);
@@ -172,18 +170,19 @@ public class TestCompiler implements HashTreeTraverser {
         }
     }
 
-    private void trackIterationListeners(LinkedList<TestElement> pStack) {
+    @SuppressWarnings("NonApiType")
+    private static void trackIterationListeners(LinkedList<TestElement> pStack) {
         TestElement child = pStack.getLast();
-        if (child instanceof LoopIterationListener) {
+        if (child instanceof LoopIterationListener loopListener) {
             ListIterator<TestElement> iter = pStack.listIterator(pStack.size());
             while (iter.hasPrevious()) {
                 TestElement item = iter.previous();
                 if (item == child) {
                     continue;
                 }
-                if (item instanceof Controller) {
+                if (item instanceof Controller controller) {
                     TestBeanHelper.prepare(child);
-                    ((Controller) item).addIterationListener((LoopIterationListener) child);
+                    controller.addIterationListener(loopListener);
                     break;
                 }
             }
@@ -209,23 +208,23 @@ public class TestCompiler implements HashTreeTraverser {
             List<PostProcessor> tempPost = new ArrayList<>();
             List<Assertion> tempAssertions = new ArrayList<>();
             for (Object item : testTree.list(stack.subList(0, i))) {
-                if (item instanceof ConfigTestElement) {
-                    configs.add((ConfigTestElement) item);
+                if (item instanceof ConfigTestElement configElement) {
+                    configs.add(configElement);
                 }
-                if (item instanceof SampleListener) {
-                    listeners.add((SampleListener) item);
+                if (item instanceof SampleListener listener) {
+                    listeners.add(listener);
                 }
-                if (item instanceof Timer) {
-                    timers.add((Timer) item);
+                if (item instanceof Timer timer) {
+                    timers.add(timer);
                 }
-                if (item instanceof Assertion) {
-                    tempAssertions.add((Assertion) item);
+                if (item instanceof Assertion assertion) {
+                    tempAssertions.add(assertion);
                 }
-                if (item instanceof PostProcessor) {
-                    tempPost.add((PostProcessor) item);
+                if (item instanceof PostProcessor postProcessor) {
+                    tempPost.add(postProcessor);
                 }
-                if (item instanceof PreProcessor) {
-                    tempPre.add((PreProcessor) item);
+                if (item instanceof PreProcessor preProcessor) {
+                    tempPre.add(preProcessor);
                 }
             }
             assertions.addAll(0, tempAssertions);
@@ -251,11 +250,11 @@ public class TestCompiler implements HashTreeTraverser {
         for (int i = stack.size(); i > 0; i--) {
             addDirectParentControllers(controllers, stack.get(i - 1));
             for (Object item : testTree.list(stack.subList(0, i))) {
-                if (item instanceof SampleListener) {
-                    listeners.add((SampleListener) item);
+                if (item instanceof SampleListener listener) {
+                    listeners.add(listener);
                 }
-                if (item instanceof Assertion) {
-                    assertions.add((Assertion) item);
+                if (item instanceof Assertion assertion) {
+                    assertions.add(assertion);
                 }
             }
         }
@@ -271,10 +270,10 @@ public class TestCompiler implements HashTreeTraverser {
      * @param controllers
      * @param maybeController
      */
-    private void addDirectParentControllers(List<Controller> controllers, TestElement maybeController) {
-        if (maybeController instanceof Controller) {
+    private static void addDirectParentControllers(List<? super Controller> controllers, TestElement maybeController) {
+        if (maybeController instanceof Controller controller) {
             log.debug("adding controller: {} to sampler config", maybeController);
-            controllers.add((Controller) maybeController);
+            controllers.add(controller);
         }
     }
 
@@ -283,7 +282,7 @@ public class TestCompiler implements HashTreeTraverser {
         private final TestElement child;
         private final TestElement parent;
 
-        public ObjectPair(TestElement child, TestElement parent) {
+        private ObjectPair(TestElement child, TestElement parent) {
             this.child = child;
             this.parent = parent;
         }
@@ -297,20 +296,20 @@ public class TestCompiler implements HashTreeTraverser {
         /** {@inheritDoc} */
         @Override
         public boolean equals(Object o) {
-            if (o instanceof ObjectPair) {
-                return child == ((ObjectPair) o).child && parent == ((ObjectPair) o).parent;
+            if (o instanceof ObjectPair other) {
+                return child == other.child && parent == other.parent;
             }
             return false;
         }
     }
 
-    private void configureWithConfigElements(Sampler sam, List<ConfigTestElement> configs) {
+    private static void configureWithConfigElements(Sampler sam, List<? extends ConfigTestElement> configs) {
         sam.clearTestElementChildren();
         for (ConfigTestElement config  : configs) {
             if (!(config instanceof NoConfigMerge))
             {
-                if(sam instanceof ConfigMergabilityIndicator) {
-                    if(((ConfigMergabilityIndicator)sam).applies(config)) {
+                if(sam instanceof ConfigMergabilityIndicator indicator) {
+                    if(indicator.applies(config)) {
                         sam.addTestElement(config);
                     }
                 } else {

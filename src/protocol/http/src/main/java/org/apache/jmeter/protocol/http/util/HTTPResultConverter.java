@@ -100,17 +100,17 @@ public class HTTPResultConverter extends SampleResultConverter {
 
         // If we have a file, but no data, then read the file
         String resultFileName = res.getResultFileName();
-        if (resultFileName.length()>0
+        if (!resultFileName.isEmpty()
         &&  res.getResponseData().length == 0) {
             readFile(resultFileName,res);
         }
         return res;
     }
 
-    private void retrieveHTTPItem(HierarchicalStreamReader reader,
+    private static void retrieveHTTPItem(HierarchicalStreamReader reader,
             HTTPSampleResult res, Object subItem) {
-        if (subItem instanceof URL) {
-            res.setURL((URL) subItem);
+        if (subItem instanceof URL url) {
+            res.setURL(url);
         } else {
             String nodeName = reader.getNodeName();
             if (nodeName.equals(TAG_COOKIES)) {

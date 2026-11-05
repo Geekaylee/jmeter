@@ -19,7 +19,6 @@ package org.apache.jmeter.protocol.java.sampler;
 
 import java.lang.reflect.Method;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -33,6 +32,7 @@ import org.apache.jmeter.samplers.SampleResult;
 import org.apache.jmeter.testelement.TestElement;
 import org.apache.jmeter.testelement.TestStateListener;
 import org.apache.jmeter.testelement.property.TestElementProperty;
+import org.apache.jorphan.collections.IdentityKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,8 +58,8 @@ public class JavaSampler extends AbstractSampler implements TestStateListener, I
      * Set used to register instances which implement tearDownTest.
      * This is used so that the JavaSamplerClient can be notified when the test ends.
      */
-    private static final Set<JavaSampler> TEAR_DOWN_SET =
-            Collections.newSetFromMap(new ConcurrentHashMap<JavaSampler,Boolean>());
+    private static final Set<IdentityKey<JavaSampler>> TEAR_DOWN_SET =
+            ConcurrentHashMap.newKeySet();
 
     /**
      * Property key representing the classname of the JavaSamplerClient to user.
@@ -103,7 +103,7 @@ public class JavaSampler extends AbstractSampler implements TestStateListener, I
         setArguments(new Arguments());
     }
 
-    /*
+    /**
      * Ensure that the required class variables are cloned,
      * as this is not currently done by the super-implementation.
      */
@@ -197,7 +197,7 @@ public class JavaSampler extends AbstractSampler implements TestStateListener, I
         SampleResult result = javaClient.runTest(context);
 
         // Only set the default label if it has not been set
-        if (result != null && result.getSampleLabel().length() == 0) {
+        if (result != null && result.getSampleLabel().isEmpty()) {
             result.setSampleLabel(getName());
         }
 
@@ -226,7 +226,7 @@ public class JavaSampler extends AbstractSampler implements TestStateListener, I
             }
 
             if(isToBeRegistered) {
-                TEAR_DOWN_SET.add(this);
+                TEAR_DOWN_SET.add(new IdentityKey<>(this));
             }
         } catch (Exception e) {
             if (log.isErrorEnabled()) {
@@ -236,16 +236,6 @@ public class JavaSampler extends AbstractSampler implements TestStateListener, I
         }
         return client;
     }
-
-    /**
-     * Retrieves reference to JavaSamplerClient.
-     *
-     * Convenience method used to check for null reference without actually
-     * creating a JavaSamplerClient
-     *
-     * @return reference to JavaSamplerClient NOTUSED private JavaSamplerClient
-     *         retrieveJavaClient() { return javaClient; }
-     */
 
     /**
      * Generate a String identifier of this instance for debugging purposes.
@@ -292,7 +282,8 @@ public class JavaSampler extends AbstractSampler implements TestStateListener, I
             log.debug("{}\ttestEnded", whoAmI());
         }
         synchronized (TEAR_DOWN_SET) {
-            for (JavaSampler javaSampler : TEAR_DOWN_SET) {
+            for (IdentityKey<JavaSampler> key : TEAR_DOWN_SET) {
+                JavaSampler javaSampler = key.getValue();
                 JavaSamplerClient client = javaSampler.javaClient;
                 if (client != null) {
                     client.teardownTest(javaSampler.context);
@@ -347,8 +338,8 @@ public class JavaSampler extends AbstractSampler implements TestStateListener, I
 
     @Override
     public boolean interrupt() {
-        if (javaClient instanceof Interruptible) {
-            return ((Interruptible) javaClient).interrupt();
+        if (javaClient instanceof Interruptible interruptible) {
+            return interruptible.interrupt();
 
         }
         return false;

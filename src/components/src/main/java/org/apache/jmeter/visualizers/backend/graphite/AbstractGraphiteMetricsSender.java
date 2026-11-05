@@ -17,11 +17,11 @@
 
 package org.apache.jmeter.visualizers.backend.graphite;
 
-import java.util.concurrent.TimeUnit;
+import java.time.Duration;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.pool2.impl.GenericKeyedObjectPool;
 import org.apache.commons.pool2.impl.GenericKeyedObjectPoolConfig;
+import org.apache.jorphan.util.StringUtilities;
 
 /**
  * Base class for {@link GraphiteMetricsSender}
@@ -44,8 +44,8 @@ abstract class AbstractGraphiteMetricsSender implements GraphiteMetricsSender {
         config.setMaxTotalPerKey(-1);
         config.setMaxTotal(-1);
         config.setMaxIdlePerKey(-1);
-        config.setMinEvictableIdleTimeMillis(TimeUnit.MINUTES.toMillis(3));
-        config.setTimeBetweenEvictionRunsMillis(TimeUnit.MINUTES.toMillis(3));
+        config.setMinEvictableIdleDuration(Duration.ofMinutes(3));
+        config.setTimeBetweenEvictionRuns(Duration.ofMinutes(3));
 
         return new GenericKeyedObjectPool<>(
                 new SocketOutputStreamPoolFactory(SOCKET_CONNECT_TIMEOUT_MS, SOCKET_TIMEOUT), config);
@@ -63,7 +63,6 @@ abstract class AbstractGraphiteMetricsSender implements GraphiteMetricsSender {
      * @return the sanitized text
      */
     static String sanitizeString(String s) {
-        // String#replace uses regexp
-        return StringUtils.replaceChars(s, "\\ .", "--_");
+        return StringUtilities.replaceChars(s, "\\ .", "--_");
     }
 }

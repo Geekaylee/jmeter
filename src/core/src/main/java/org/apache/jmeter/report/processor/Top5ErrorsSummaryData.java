@@ -29,7 +29,7 @@ import java.util.Map;
 public class Top5ErrorsSummaryData {
 
     private static final Long ONE = 1L;
-    private Map<String, Long> countPerError;
+    private final Map<String, Long> countPerError;
     private long total;
     private long errors;
 
@@ -79,6 +79,6 @@ public class Top5ErrorsSummaryData {
                 .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
                 .limit(maxSize)
                 .map(e -> new Object[]{e.getKey(), e.getValue()})
-                .toArray(e -> new Object[maxSize][2]);
+                .toArray(Object[][]::new);
     }
 }

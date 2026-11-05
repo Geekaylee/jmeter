@@ -17,10 +17,10 @@
 
 package org.apache.jmeter.gui.logging;
 
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedList;
 import java.util.List;
 
 import org.apache.logging.log4j.Level;
@@ -43,9 +43,9 @@ import org.slf4j.LoggerFactory;
 
 public class TestGuiLogEventAppender {
 
-    private static List<String> log4j2LevelErrorMessages = Collections.synchronizedList(new LinkedList<>());
+    private static List<String> log4j2LevelErrorMessages = Collections.synchronizedList(new ArrayList<>());
 
-    /*
+    /**
      * Configure logging with GuiLogEventAppender for root logger, and override the handler of GuiLogEventAppender
      * to see if there's any log4j2 AppenderControl level error (e.g, "Recursive call to appender gui-log-event").
      */
@@ -74,14 +74,17 @@ public class TestGuiLogEventAppender {
 
         guiLogEventAppender.stop();
         guiLogEventAppender.setHandler(new ErrorHandler() {
+            @Override
             public void error(String msg) {
                 log4j2LevelErrorMessages.add(msg);
             }
 
+            @Override
             public void error(String msg, Throwable t) {
                 log4j2LevelErrorMessages.add(msg + " " + t);
             }
 
+            @Override
             public void error(String msg, LogEvent event, Throwable t) {
                 log4j2LevelErrorMessages.add(msg + " " + t);
             }
@@ -94,7 +97,7 @@ public class TestGuiLogEventAppender {
         log4j2LevelErrorMessages.clear();
     }
 
-    /*
+    /**
      * Make simple logs and see whether there's any log4j2 AppenderControl level error (e.g, "Recursive call to
      * appender gui-log-event").
      * For example, if GuiLogEventAppender meets an exception while accessing GuiPackage class due to static member
@@ -104,6 +107,6 @@ public class TestGuiLogEventAppender {
     public void testSimpleLogging() throws Exception {
         final Logger log = LoggerFactory.getLogger(TestGuiLogEventAppender.class);
         log.info("logger created.");
-        assertTrue("Logging appender error: " + log4j2LevelErrorMessages, log4j2LevelErrorMessages.isEmpty());
+        assertTrue(log4j2LevelErrorMessages.isEmpty(), "Logging appender error: " + log4j2LevelErrorMessages);
     }
 }

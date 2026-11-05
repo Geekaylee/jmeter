@@ -31,17 +31,20 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.config.Arguments;
 import org.apache.jmeter.samplers.SampleResult;
 import org.apache.jmeter.util.JMeterUtils;
 import org.apache.jmeter.visualizers.backend.AbstractBackendListenerClient;
+import org.apache.jmeter.visualizers.backend.BackendListenerClient;
 import org.apache.jmeter.visualizers.backend.BackendListenerContext;
 import org.apache.jmeter.visualizers.backend.ErrorMetric;
 import org.apache.jmeter.visualizers.backend.SamplerMetric;
 import org.apache.jmeter.visualizers.backend.UserMetric;
+import org.apache.jorphan.util.StringUtilities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.auto.service.AutoService;
 
 /**
  * Implementation of {@link AbstractBackendListenerClient} to write to InfluxDB
@@ -49,10 +52,11 @@ import org.slf4j.LoggerFactory;
  *
  * @since 3.2
  */
+@AutoService(BackendListenerClient.class)
 public class InfluxdbBackendListenerClient extends AbstractBackendListenerClient implements Runnable {
 
     private static final Logger log = LoggerFactory.getLogger(InfluxdbBackendListenerClient.class);
-    private ConcurrentHashMap<String, SamplerMetric> metricsPerSampler = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, SamplerMetric> metricsPerSampler = new ConcurrentHashMap<>();
     // Name of the measurement
     private static final String EVENTS_FOR_ANNOTATION = "events";
 
@@ -345,10 +349,10 @@ public class InfluxdbBackendListenerClient extends AbstractBackendListenerClient
         // Check if more rows which started with 'TAG_' are filled ( corresponding to user tag )
         StringBuilder userTagBuilder = new StringBuilder();
         context.getParameterNamesIterator().forEachRemaining(name -> {
-            if (StringUtils.isNotBlank(name)
+            if (StringUtilities.isNotBlank(name)
                     && !DEFAULT_ARGS.containsKey(name.trim())
                     && name.startsWith("TAG_")
-                    && StringUtils.isNotBlank(context.getParameter(name))) {
+                    && StringUtilities.isNotBlank(context.getParameter(name))) {
                 final String tagName = name.trim().substring(4);
                 final String tagValue = context.getParameter(name).trim();
                 userTagBuilder.append(',')
@@ -370,7 +374,7 @@ public class InfluxdbBackendListenerClient extends AbstractBackendListenerClient
         DecimalFormat format = new DecimalFormat("0.##");
         for (String percentile : percentilesStringArray) {
             String trimmedPercentile = percentile.trim();
-            if (StringUtils.isEmpty(trimmedPercentile)) {
+            if (StringUtilities.isEmpty(trimmedPercentile)) {
                 continue;
             }
             try {
@@ -434,7 +438,7 @@ public class InfluxdbBackendListenerClient extends AbstractBackendListenerClient
     private void addAnnotation(boolean isStartOfTest) {
         String tags = TAG_APPLICATION + applicationName +
                 ",title=ApacheJMeter" + userTag +
-                (StringUtils.isNotEmpty(testTags) ? TAGS + testTags : "");
+                (StringUtilities.isNotEmpty(testTags) ? TAGS + testTags : "");
         String field = TEXT +
                 AbstractInfluxdbMetricsSender.fieldToStringValue(
                         testTitle + (isStartOfTest ? " started" : " ended")) + "\"";

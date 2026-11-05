@@ -116,10 +116,9 @@ public class SampleTimeout extends AbstractTestElement implements Serializable, 
         if (timeout <= 0) {
             return;
         }
-        if (!(samp instanceof Interruptible)) { // may be applied to a whole test
+        if (!(samp instanceof Interruptible sampler)) { // may be applied to a whole test
             return; // Cannot time out in this case
         }
-        final Interruptible sampler = (Interruptible) samp;
 
         Callable<Object> call = () -> {
             long start = System.nanoTime();
@@ -168,11 +167,11 @@ public class SampleTimeout extends AbstractTestElement implements Serializable, 
         return JMeterUtils.getResString("sample_timeout_memo"); //$NON-NLS-1$
     }
 
-    private String whoAmI(String id, TestElement o) {
+    private static String whoAmI(String id, TestElement o) {
         return id + " @" + System.identityHashCode(o)+ " '"+ o.getName() + "' " + (log.isDebugEnabled() ?  Thread.currentThread().getName() : "");
     }
 
-    private String getInfo(TestElement o) {
+    private static String getInfo(TestElement o) {
         return whoAmI(o.getClass().getSimpleName(), o);
     }
 

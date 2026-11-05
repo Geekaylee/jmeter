@@ -20,17 +20,17 @@ package org.apache.jmeter.samplers;
 import java.io.Serializable;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Properties;
 
-import org.apache.commons.lang3.CharUtils;
-import org.apache.commons.lang3.time.FastDateFormat;
 import org.apache.jmeter.save.CSVSaveService;
 import org.apache.jmeter.testelement.TestPlan;
 import org.apache.jmeter.util.JMeterUtils;
+import org.apache.jorphan.util.CharUtils;
 import org.apache.jorphan.util.JMeterError;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -283,6 +283,10 @@ public class SampleSaveConfiguration implements Cloneable, Serializable {
     // Read in the properties having to do with saving from a properties file.
     static {
         Properties props = JMeterUtils.getJMeterProperties();
+        if (props == null) {
+            // If properties are not initialized, proceed with defaults
+            props = new Properties();
+        }
 
         SUB_RESULTS      = TRUE.equalsIgnoreCase(props.getProperty(SUBRESULTS_PROP, TRUE));
         ASSERTIONS      = TRUE.equalsIgnoreCase(props.getProperty(ASSERTIONS_PROP, TRUE));
@@ -296,11 +300,11 @@ public class SampleSaveConfiguration implements Cloneable, Serializable {
         String dlm = JMeterUtils.getDelimiter(props.getProperty(DEFAULT_DELIMITER_PROP, DEFAULT_DELIMITER));
         char ch = dlm.charAt(0);
 
-        if (CharUtils.isAsciiAlphanumeric(ch) || ch == CSVSaveService.QUOTING_CHAR){
+        if ((ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || ch == CSVSaveService.QUOTING_CHAR){
             throw new JMeterError("Delimiter '"+ch+"' must not be alphanumeric or "+CSVSaveService.QUOTING_CHAR+".");
         }
 
-        if (ch != '\t' && !CharUtils.isAsciiPrintable(ch)){
+        if (ch != '\t' && !CharUtils.isAscii(ch)){
             throw new JMeterError("Delimiter (code "+(int)ch+") must be printable.");
         }
 
@@ -464,7 +468,9 @@ public class SampleSaveConfiguration implements Cloneable, Serializable {
     private boolean idleTime = IDLE_TIME;
 
     // Does not appear to be used (yet)
-    private int assertionsResultsToSave = ASSERTIONS_RESULT_TO_SAVE;
+    // it is
+    @SuppressWarnings("FieldCanBeStatic")
+    private final int assertionsResultsToSave = ASSERTIONS_RESULT_TO_SAVE;
 
     // Don't save this, as it is derived from the time format
     private boolean printMilliseconds = PRINT_MILLISECONDS;
@@ -472,12 +478,12 @@ public class SampleSaveConfiguration implements Cloneable, Serializable {
     private transient String dateFormat = DATE_FORMAT;
 
     /** A formatter for the time stamp.
-     * Make transient as we don't want to save the FastDateFormat class
+     * Make transient as we don't want to save the DateTimeFormatter class
      * Also, there's currently no way to change the value via the GUI, so changing it
      * later means editing the JMX, or recreating the Listener.
      */
-    private transient FastDateFormat timestampFormatter =
-        dateFormat != null ? FastDateFormat.getInstance(dateFormat) : null;
+    private transient DateTimeFormatter timestampFormatter =
+        dateFormat != null ? DateTimeFormatter.ofPattern(dateFormat) : null;
 
     // Don't save this, as not settable via GUI
     private String delimiter = DELIMITER;
@@ -592,7 +598,7 @@ public class SampleSaveConfiguration implements Cloneable, Serializable {
     private void setupDateFormat(String pDateFormat) {
         this.dateFormat = pDateFormat;
         if(dateFormat != null) {
-            this.timestampFormatter = FastDateFormat.getInstance(dateFormat);
+            this.timestampFormatter = DateTimeFormatter.ofPattern(dateFormat);
         } else {
             this.timestampFormatter = null;
         }
@@ -603,7 +609,7 @@ public class SampleSaveConfiguration implements Cloneable, Serializable {
         try {
             SampleSaveConfiguration clone = (SampleSaveConfiguration)super.clone();
             if(this.dateFormat != null) {
-                clone.timestampFormatter = (FastDateFormat)this.threadSafeLenientFormatter().clone();
+                clone.timestampFormatter = this.threadSafeLenientFormatter();
             }
             return clone;
         }
@@ -957,14 +963,14 @@ public class SampleSaveConfiguration implements Cloneable, Serializable {
     }
 
     /**
-     * @return {@link FastDateFormat} Thread safe lenient formatter
+     * @return {@link DateTimeFormatter} Thread safe lenient formatter
      */
-    public FastDateFormat threadSafeLenientFormatter() {
+    public DateTimeFormatter threadSafeLenientFormatter() {
         // When restored by XStream threadSafeLenientFormatter may not have
         // been initialized
         if(timestampFormatter == null) {
             timestampFormatter =
-                    dateFormat != null ? FastDateFormat.getInstance(dateFormat) : null;
+                    dateFormat != null ? DateTimeFormatter.ofPattern(dateFormat) : null;
         }
         return timestampFormatter;
     }

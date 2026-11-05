@@ -66,7 +66,7 @@ public class BeanShellListener extends BeanShellTestElement
             processFileOrScript(bshInterpreter);
         } catch (JMeterException e) {
             if (log.isWarnEnabled()) {
-                log.warn("Problem in BeanShell script. {}", e.toString());
+                log.warn("Problem in BeanShell element named: '{}'", getName(), e);
             }
         }
     }
@@ -92,6 +92,7 @@ public class BeanShellListener extends BeanShellTestElement
     }
 
     @Override
+    @SuppressWarnings("RedundantOverride")
     public Object clone() {
         return super.clone();
     }

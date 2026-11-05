@@ -44,9 +44,6 @@ public class LaxDeflateInputStream extends DeflateInputStream {
         this.relax = relax;
     }
 
-    /* (non-Javadoc)
-     * @see org.apache.http.client.entity.DeflateInputStream#read(byte[], int, int)
-     */
     @Override
     public int read(byte[] b, int off, int len) throws IOException {
         try {
@@ -80,7 +77,7 @@ public class LaxDeflateInputStream extends DeflateInputStream {
      * @return -1 if relax
      * @throws EOFException
      */
-    private int handleRelaxMode(final EOFException ex, final boolean relaxMode) throws EOFException {
+    private static int handleRelaxMode(final EOFException ex, final boolean relaxMode) throws EOFException {
         if(relaxMode) {
             return -1;
         } else {

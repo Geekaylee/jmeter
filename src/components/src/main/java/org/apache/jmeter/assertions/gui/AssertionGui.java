@@ -157,8 +157,7 @@ public class AssertionGui extends AbstractAssertionGui {
     public void modifyTestElement(TestElement el) {
         GuiUtils.stopTableEditing(stringTable);
         configureTestElement(el);
-        if (el instanceof ResponseAssertion) {
-            ResponseAssertion ra = (ResponseAssertion) el;
+        if (el instanceof ResponseAssertion ra) {
             ra.setCustomFailureMessage(alternativeFailureMessage.getText());
             saveScopeSettings(ra);
 
@@ -294,7 +293,7 @@ public class AssertionGui extends AbstractAssertionGui {
             tableModel.addRow(new Object[] { jMeterProperty.getStringValue() });
         }
 
-        boolean testStringsPresent = model.getTestStrings().size() != 0;
+        boolean testStringsPresent = !model.getTestStrings().isEmpty();
         deletePattern.setEnabled(testStringsPresent);
 
         tableModel.fireTableDataChanged();
@@ -370,20 +369,20 @@ public class AssertionGui extends AbstractAssertionGui {
         return panel;
     }
 
-    private void addField(JPanel panel, JToggleButton button, GridBagConstraints gbc) {
+    private static void addField(JPanel panel, JToggleButton button, GridBagConstraints gbc) {
         panel.add(button, gbc.clone());
         gbc.gridx++;
         gbc.fill=GridBagConstraints.HORIZONTAL;
     }
 
     // Next line
-    private void resetContraints(GridBagConstraints gbc) {
+    private static void resetContraints(GridBagConstraints gbc) {
         gbc.gridx = 0;
         gbc.gridy++;
         gbc.fill=GridBagConstraints.NONE;
     }
 
-    private void initConstraints(GridBagConstraints gbc) {
+    private static void initConstraints(GridBagConstraints gbc) {
         gbc.anchor = GridBagConstraints.NORTHWEST;
         gbc.fill = GridBagConstraints.NONE;
         gbc.gridheight = 1;

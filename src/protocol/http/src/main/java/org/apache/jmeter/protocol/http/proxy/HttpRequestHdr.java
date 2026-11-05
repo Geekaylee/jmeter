@@ -24,11 +24,11 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.StringTokenizer;
 
-import org.apache.commons.lang3.CharUtils;
 import org.apache.jmeter.protocol.http.config.MultipartUrlConfig;
 import org.apache.jmeter.protocol.http.control.Header;
 import org.apache.jmeter.protocol.http.control.HeaderManager;
@@ -39,6 +39,7 @@ import org.apache.jmeter.protocol.http.util.ConversionUtils;
 import org.apache.jmeter.protocol.http.util.HTTPConstants;
 import org.apache.jmeter.testelement.TestElement;
 import org.apache.jmeter.util.JMeterUtils;
+import org.apache.jorphan.util.CharUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -80,11 +81,11 @@ public class HttpRequestHdr {
 
     private String firstLine; // saved copy of first line for error reports
 
-    private String prefix;
+    private final String prefix;
 
-    private int httpSampleNameMode;
+    private final int httpSampleNameMode;
 
-    private String httpSampleNameFormat;
+    private final String httpSampleNameFormat;
 
     private boolean detectGraphQLRequest;
 
@@ -156,7 +157,7 @@ public class HttpRequestHdr {
         while ((inHeaders || readLength < dataLength) && ((x = in.read()) != -1)) {
             line.write(x);
             clientRequest.write(x);
-            if (firstLine && !CharUtils.isAscii((char) x)){// includes \n
+            if (firstLine && x >= 128){// includes \n
                 throw new IllegalArgumentException("Only ASCII supported in headers (perhaps SSL was used?)");
             }
             if (inHeaders && (byte) x == (byte) '\n') { // $NON-NLS-1$
@@ -164,7 +165,7 @@ public class HttpRequestHdr {
                     inHeaders = false;
                     firstLine = false; // cannot be first line either
                 }
-                final String reqLine = line.toString();
+                final String reqLine = line.toString(StandardCharsets.UTF_8.name());
                 if (firstLine) {
                     parseFirstLine(reqLine);
                     firstLine = false;
@@ -189,7 +190,7 @@ public class HttpRequestHdr {
         if (log.isDebugEnabled()){
             log.debug("rawPostData in default JRE encoding: {}, Request: '{}'",
                     new String(rawPostData, Charset.defaultCharset()),
-                    clientRequest.toString().replaceAll("\r\n", CRLF));
+                    clientRequest.toString(StandardCharsets.ISO_8859_1.name()).replaceAll("\r\n", CRLF));
         }
         return clientRequest.toByteArray();
     }
@@ -248,7 +249,7 @@ public class HttpRequestHdr {
         log.debug("First Line url: {}", url);
     }
 
-    /*
+    /**
      * Split line into name/value pairs and store in headers if relevant
      * If name = "content-length", then return value as int, else return 0
      */
@@ -297,7 +298,7 @@ public class HttpRequestHdr {
         return null;
     }
 
-    private boolean isMultipart(String contentType) {
+    private static boolean isMultipart(String contentType) {
         return contentType != null && contentType.startsWith(HTTPConstants.MULTIPART_FORM_DATA);
     }
 
@@ -415,7 +416,7 @@ public class HttpRequestHdr {
      *            String that is partially tokenized.
      * @return The remainder
      */
-    private String getToken(StringTokenizer tk) {
+    private static String getToken(StringTokenizer tk) {
         if (tk.hasMoreTokens()) {
             return tk.nextToken();
         }

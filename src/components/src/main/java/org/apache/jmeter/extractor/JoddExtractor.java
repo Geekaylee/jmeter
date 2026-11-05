@@ -21,7 +21,7 @@ import java.util.List;
 
 import org.apache.jmeter.threads.JMeterContextService;
 import org.apache.jmeter.util.JMeterUtils;
-import org.apache.jorphan.util.JOrphanUtils;
+import org.apache.jorphan.util.StringUtilities;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.LoadingCache;
@@ -94,8 +94,8 @@ public class JoddExtractor implements Extractor {
     }
 
 
-    private String extractValue(String attribute, Node element) {
-        if (!JOrphanUtils.isBlank(attribute)) {
+    private static String extractValue(String attribute, Node element) {
+        if (StringUtilities.isNotBlank(attribute)) {
             return element.getAttribute(attribute);
         } else {
             return element.getTextContent().trim();

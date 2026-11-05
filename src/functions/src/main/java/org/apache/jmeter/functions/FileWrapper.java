@@ -26,6 +26,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * This class wraps the FileRowColContainer for use across multiple threads.
  * <p>
@@ -34,6 +35,7 @@ import org.slf4j.LoggerFactory;
  * together with the current line number.
  *
  */
+//@AutoService(Function.class)
 public final class FileWrapper {
 
     private static final Logger log = LoggerFactory.getLogger(FileWrapper.class);
@@ -67,8 +69,8 @@ public final class FileWrapper {
     }
 
     private static String checkDefault(String file) {
-        if (file.length() == 0) {
-            if (fileContainers.size() == 1 && defaultFile.length() > 0) {
+        if (file.isEmpty()) {
+            if (fileContainers.size() == 1 && !defaultFile.isEmpty()) {
                 log.warn("Using default: {}", defaultFile);
                 file = defaultFile;
             } else {
@@ -84,7 +86,7 @@ public final class FileWrapper {
     public static synchronized void open(String file, String alias) {
         log.info("Opening {} as {}", file, alias);
         file = checkDefault(file);
-        if (alias.length() == 0) {
+        if (alias.isEmpty()) {
             log.error("Alias cannot be empty");
             return;
         }
@@ -107,7 +109,7 @@ public final class FileWrapper {
             frcc = new FileRowColContainer(file);
             fileContainers.put(alias, frcc);
             log.info("Saved {} as {} delimiter=<{}>", file, alias, frcc.getDelimiter());
-            if (defaultFile.length() == 0) {
+            if (defaultFile.isEmpty()) {
                 defaultFile = file;// Save in case needed later
             }
         }

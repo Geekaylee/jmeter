@@ -93,8 +93,7 @@ public class JSONPostProcessorGui extends AbstractPostProcessorGui {
     @Override
     public void modifyTestElement(TestElement c) {
         super.configureTestElement(c);
-        if (c instanceof JSONPostProcessor) {
-            JSONPostProcessor config = (JSONPostProcessor) c;
+        if (c instanceof JSONPostProcessor config) {
             saveScopeSettings(config);
             config.setRefNames(refNamesField.getText());
             config.setJsonPathExpressions(jsonPathExpressionsField.getText());
@@ -152,7 +151,7 @@ public class JSONPostProcessorGui extends AbstractPostProcessorGui {
         return panel;
     }
 
-    private void addField(JPanel panel, JLabeledTextField field, GridBagConstraints gbc) {
+    private static void addField(JPanel panel, JLabeledTextField field, GridBagConstraints gbc) {
         List<JComponent> item = field.getComponentList();
         panel.add(item.get(0), gbc.clone());
         gbc.gridx++;
@@ -161,7 +160,7 @@ public class JSONPostProcessorGui extends AbstractPostProcessorGui {
         panel.add(item.get(1), gbc.clone());
     }
 
-    private void addField(JPanel panel, JLabel label, JCheckBox checkBox, GridBagConstraints gbc) {
+    private static void addField(JPanel panel, JLabel label, JCheckBox checkBox, GridBagConstraints gbc) {
         panel.add(label, gbc.clone());
         gbc.gridx++;
         gbc.weightx = 1;
@@ -169,14 +168,14 @@ public class JSONPostProcessorGui extends AbstractPostProcessorGui {
         panel.add(checkBox, gbc.clone());
     }
 
-    private void nextLine(GridBagConstraints gbc) {
+    private static void nextLine(GridBagConstraints gbc) {
         gbc.gridx = 0;
         gbc.gridy++;
         gbc.weightx = 0;
         gbc.fill = GridBagConstraints.NONE;
     }
 
-    private void initConstraints(GridBagConstraints gbc) {
+    private static void initConstraints(GridBagConstraints gbc) {
         gbc.anchor = GridBagConstraints.NORTHWEST;
         gbc.fill = GridBagConstraints.NONE;
         gbc.gridheight = 1;

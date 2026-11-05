@@ -27,10 +27,13 @@ import org.apache.jmeter.samplers.Sampler;
 import org.apache.jmeter.threads.JMeterVariables;
 import org.apache.jmeter.util.JMeterUtils;
 
+import com.google.auto.service.AutoService;
+
 /**
  * Function to return the name of the current sampler.
  * @since 2.5
  */
+@AutoService(Function.class)
 public class SamplerName extends AbstractFunction {
 
     private static final String KEY = "__samplerName"; //$NON-NLS-1$
@@ -55,7 +58,7 @@ public class SamplerName extends AbstractFunction {
             JMeterVariables vars = getVariables();
             if (vars != null) {// May be null if function is used on TestPlan
                 String varName = ((CompoundVariable) values[0]).execute().trim();
-                if (varName.length() > 0) {
+                if (!varName.isEmpty()) {
                     vars.put(varName, name);
                 }
             }

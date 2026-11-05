@@ -17,48 +17,56 @@
 
 package org.apache.jmeter.timers;
 
-import java.beans.BeanInfo;
-import java.beans.IntrospectionException;
-import java.beans.Introspector;
-import java.util.ResourceBundle;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.jmeter.gui.GUIMenuSortOrder;
 import org.apache.jmeter.gui.TestElementMetadata;
 import org.apache.jmeter.testbeans.TestBean;
 import org.apache.jmeter.testbeans.gui.GenericTestBeanCustomizer;
 import org.apache.jmeter.testelement.AbstractTestElement;
-import org.apache.jmeter.testelement.TestStateListener;
 import org.apache.jmeter.testelement.property.JMeterProperty;
-import org.apache.jmeter.testelement.property.StringProperty;
+import org.apache.jmeter.testelement.schema.PropertiesAccessor;
 import org.apache.jmeter.threads.AbstractThreadGroup;
 import org.apache.jmeter.threads.JMeterContextService;
 import org.apache.jmeter.util.JMeterUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.jorphan.collections.IdentityKey;
+import org.apache.jorphan.util.EnumUtils;
+import org.apiguardian.api.API;
 
 /**
  * This class implements a constant throughput timer. A Constant Throughput
  * Timer paces the samplers under its influence so that the total number of
  * samples per unit of time approaches a given constant as much as possible.
  *
+ * <p>
  * There are two different ways of pacing the requests:
- * - delay each thread according to when it last ran
- * - delay each thread according to when any thread last ran
+ * <ul>
+ * <li>delay each thread according to when it last ran</li>
+ * <li>delay each thread according to when any thread last ran</li>
+ * </ul>
  */
 @GUIMenuSortOrder(4)
 @TestElementMetadata(labelResource = "displayName")
-public class ConstantThroughputTimer extends AbstractTestElement implements Timer, TestStateListener, TestBean {
+public class ConstantThroughputTimer extends AbstractTestElement implements Timer, TestBean {
     private static final long serialVersionUID = 4;
 
     private static class ThroughputInfo{
         final Object MUTEX = new Object();
         long lastScheduledTime = 0;
     }
-    private static final Logger log = LoggerFactory.getLogger(ConstantThroughputTimer.class);
+    private static final AtomicLong PREV_TEST_STARTED = new AtomicLong(0L);
 
     private static final double MILLISEC_PER_MIN = 60000.0;
+
+    private static final Mode DEFAULT_CALC_MODE = Mode.ThisThreadOnly;
+
+    // TODO: most props use class simpleName as prefix but that would break backward compatiblity here
+    public static final String THROUGHPUT = "throughput";
+    public static final String CALC_MODE = "calcMode";
+    @API(status = API.Status.INTERNAL, since = "6.0.0")
+    public static final String MODE = "mode";
 
     /**
      * This enum defines the calculation modes used by the ConstantThroughputTimer.
@@ -89,25 +97,28 @@ public class ConstantThroughputTimer extends AbstractTestElement implements Time
      */
     private long previousTime = 0;
 
-    private Mode mode = Mode.ThisThreadOnly;
-
-    /**
-     * Desired throughput, in samples per minute.
-     */
-    private double throughput;
-
     //For calculating throughput across all threads
     private static final ThroughputInfo allThreadsInfo = new ThroughputInfo();
 
     //For holding the ThroughputInfo objects for all ThreadGroups. Keyed by AbstractThreadGroup objects
-    private static final ConcurrentMap<AbstractThreadGroup, ThroughputInfo> threadGroupsInfoMap =
+    //TestElements can't be used as keys in HashMap.
+    private static final ConcurrentMap<IdentityKey<AbstractThreadGroup>, ThroughputInfo> threadGroupsInfoMap =
             new ConcurrentHashMap<>();
-
 
     /**
      * Constructor for a non-configured ConstantThroughputTimer.
      */
     public ConstantThroughputTimer() {
+    }
+
+    @Override
+    public ConstantThroughputTimerSchema getSchema() {
+        return ConstantThroughputTimerSchema.INSTANCE;
+    }
+
+    @Override
+    public PropertiesAccessor<? extends ConstantThroughputTimer, ? extends ConstantThroughputTimerSchema> getProps() {
+        return new PropertiesAccessor<>(this, getSchema());
     }
 
     /**
@@ -117,7 +128,7 @@ public class ConstantThroughputTimer extends AbstractTestElement implements Time
      *            Desired sampling rate, in samples per minute.
      */
     public void setThroughput(double throughput) {
-        this.throughput = throughput;
+        getSchema().getThroughput().set(this, throughput);
     }
 
     /**
@@ -126,15 +137,39 @@ public class ConstantThroughputTimer extends AbstractTestElement implements Time
      * @return the rate at which samples should occur, in samples per minute.
      */
     public double getThroughput() {
-        return throughput;
+        return getSchema().getThroughput().get(this);
     }
 
+    @Deprecated
+    @SuppressWarnings("EnumOrdinal")
     public int getCalcMode() {
+        Mode mode = getMode();
+        if (mode == null) {
+            mode = DEFAULT_CALC_MODE;
+        }
         return mode.ordinal();
     }
 
+    @API(status = API.Status.MAINTAINED, since = "6.0.0")
+    public Mode getMode() {
+        String value = getSchema().getCalcMode().get(this);
+        Mode enumValue = EnumUtils.valueOf(Mode.class, value);
+        if (enumValue != null) {
+            return enumValue;
+        }
+        return DEFAULT_CALC_MODE;
+    }
+
+    @Deprecated
+    @SuppressWarnings("EnumOrdinal")
     public void setCalcMode(int mode) {
-        this.mode = Mode.values()[mode];
+        setMode(EnumUtils.values(Mode.class).get(mode));
+    }
+
+    @SuppressWarnings("EnumOrdinal")
+    @API(status = API.Status.MAINTAINED, since = "6.0.0")
+    public void setMode(Mode newMode) {
+        getSchema().getCalcMode().set(this, newMode.toString());
     }
 
     /**
@@ -146,10 +181,8 @@ public class ConstantThroughputTimer extends AbstractTestElement implements Time
     public long delay() {
         long currentTime = System.currentTimeMillis();
 
-        /*
-         * If previous time is zero, then target will be in the past.
-         * This is what we want, so first sample is run without a delay.
-        */
+        // If previous time is zero, then target will be in the past.
+        // This is what we want, so first sample is run without a delay.
         long currentTarget = previousTime  + calculateDelay();
         if (currentTime > currentTarget) {
             // We're behind schedule -- try to catch up:
@@ -175,10 +208,17 @@ public class ConstantThroughputTimer extends AbstractTestElement implements Time
 
     // Calculate the delay based on the mode
     private long calculateDelay() {
+        long testStarted = JMeterContextService.getTestStartTime();
+        long prevStarted = PREV_TEST_STARTED.get();
+        if (prevStarted != testStarted && PREV_TEST_STARTED.compareAndSet(prevStarted, testStarted)) {
+            // Reset counters if we are calculating throughput for a new test, see https://github.com/apache/jmeter/issues/6165
+            reset();
+        }
+
         long delay;
         // N.B. we fetch the throughput each time, as it may vary during a test
         double msPerRequest = MILLISEC_PER_MIN / getThroughput();
-        switch (mode) {
+        switch (getMode()) {
         case AllActiveThreads: // Total number of threads
             delay = Math.round(JMeterContextService.getNumberOfThreads() * msPerRequest);
             break;
@@ -194,13 +234,10 @@ public class ConstantThroughputTimer extends AbstractTestElement implements Time
         case AllActiveThreadsInCurrentThreadGroup_Shared: //All threads in this group - alternate calculation
             final org.apache.jmeter.threads.AbstractThreadGroup group =
                 JMeterContextService.getContext().getThreadGroup();
-            ThroughputInfo groupInfo = threadGroupsInfoMap.get(group);
+            IdentityKey<AbstractThreadGroup> key = new IdentityKey<>(group);
+            ThroughputInfo groupInfo = threadGroupsInfoMap.get(key);
             if (groupInfo == null) {
-                groupInfo = new ThroughputInfo();
-                ThroughputInfo previous = threadGroupsInfoMap.putIfAbsent(group, groupInfo);
-                if (previous != null) { // We did not replace the entry
-                    groupInfo = previous; // so use the existing one
-                }
+                groupInfo = threadGroupsInfoMap.computeIfAbsent(key, (k) -> new ThroughputInfo());
             }
             delay = calculateSharedDelay(groupInfo,Math.round(msPerRequest));
             break;
@@ -213,7 +250,7 @@ public class ConstantThroughputTimer extends AbstractTestElement implements Time
         return delay;
     }
 
-    private long calculateSharedDelay(ThroughputInfo info, long milliSecPerRequest) {
+    private static long calculateSharedDelay(ThroughputInfo info, long milliSecPerRequest) {
         final long now = System.currentTimeMillis();
         final long calculatedDelay;
 
@@ -251,18 +288,6 @@ public class ConstantThroughputTimer extends AbstractTestElement implements Time
     }
 
     /**
-     * Get the timer ready to compute delays for a new test.
-     * <p>
-     * {@inheritDoc}
-     */
-    @Override
-    public void testStarted()
-    {
-        log.debug("Test started - reset throughput calculation.");
-        reset();
-    }
-
-    /**
      * Override the setProperty method in order to convert
      * the original String calcMode property.
      * This used the locale-dependent display value, so caused
@@ -271,64 +296,16 @@ public class ConstantThroughputTimer extends AbstractTestElement implements Time
      * so the conversion only needs to happen once.
      */
     @Override
+    @SuppressWarnings("EnumOrdinal")
     public void setProperty(JMeterProperty property) {
-        if (property instanceof StringProperty) {
-            final String pn = property.getName();
-            if (pn.equals("calcMode")) {
-                final Object objectValue = property.getObjectValue();
-                try {
-                    final BeanInfo beanInfo = Introspector.getBeanInfo(this.getClass());
-                    final ResourceBundle rb = (ResourceBundle) beanInfo.getBeanDescriptor().getValue(GenericTestBeanCustomizer.RESOURCE_BUNDLE);
-                    for(Enum<Mode> e : Mode.values()) {
-                        final String propName = e.toString();
-                        if (objectValue.equals(rb.getObject(propName))) {
-                            final int tmpMode = e.ordinal();
-                            log.debug("Converted {}={} to mode={} using Locale: {}", pn, objectValue, tmpMode,
-                                    rb.getLocale());
-                            super.setProperty(pn, tmpMode);
-                            return;
-                        }
-                    }
-                    log.warn("Could not convert {}={} using Locale: {}", pn, objectValue, rb.getLocale());
-                } catch (IntrospectionException e) {
-                    log.error("Could not find BeanInfo", e);
-                }
+        String propertyName = property.getName();
+        if (propertyName.equals("calcMode")) {
+            JMeterProperty mode = GenericTestBeanCustomizer.normalizeEnumProperty(getClass(), Mode.class, property);
+            if (mode != null) {
+                super.setProperty(mode);
+                return;
             }
         }
         super.setProperty(property);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void testEnded() {
-        //NOOP
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void testStarted(String host) {
-        testStarted();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void testEnded(String host) {
-        //NOOP
-    }
-
-    // For access from test code
-    Mode getMode() {
-        return mode;
-    }
-
-    // For access from test code
-    void setMode(Mode newMode) {
-        mode = newMode;
     }
 }

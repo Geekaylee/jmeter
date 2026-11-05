@@ -57,9 +57,9 @@ public class DynamicKerberosSchemeFactory extends KerberosSchemeFactory {
         return new KerberosScheme(stripPort, isUseCanonicalHostname());
     }
 
-    private boolean isEnabled(Object contextAttribute, boolean defaultValue) {
-        if (contextAttribute instanceof Boolean) {
-            return (Boolean) contextAttribute;
+    private static boolean isEnabled(Object contextAttribute, boolean defaultValue) {
+        if (contextAttribute instanceof Boolean b) {
+            return b;
         }
         return defaultValue;
     }

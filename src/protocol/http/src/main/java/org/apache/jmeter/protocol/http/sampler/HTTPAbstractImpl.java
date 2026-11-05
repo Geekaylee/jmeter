@@ -81,6 +81,13 @@ public abstract class HTTPAbstractImpl implements Interruptible, HTTPConstantsIn
     private static final String RETURN_CUSTOM_STATUS_CODE =
             JMeterUtils.getProperty("RETURN_CUSTOM_STATUS.code");//$NON-NLS-1$
 
+    /**
+     * Name of the property which sets the default HTTP version of the samplers.
+     *
+     * @since 6.0
+     */
+    protected static final String HTTP_VERSION_PROPERTY = "httpclient.version"; // $NON-NLS-1$
+
     protected static final Predicate<String> ALL_EXCEPT_COOKIE = s -> !HTTPConstants.HEADER_COOKIE.equalsIgnoreCase(s);
 
     protected static final Predicate<String> ONLY_COOKIE = s -> HTTPConstants.HEADER_COOKIE.equalsIgnoreCase(s);
@@ -92,6 +99,34 @@ public abstract class HTTPAbstractImpl implements Interruptible, HTTPConstantsIn
             JMeterUtils.getProperty("RETURN_CUSTOM_STATUS.message"); //$NON-NLS-1$
 
     protected final HTTPSamplerBase testElement;
+
+    /**
+     * Reads the default HTTP version of the samplers from the {@code httpclient.version} property.
+     *
+     * @return the value of the property, normalized by {@link #normalizeHttpVersion(String)},
+     *         defaulting to {@code HTTP/1.1}
+     * @since 6.0
+     */
+    protected static String readDefaultHttpVersion() {
+        return normalizeHttpVersion(
+                JMeterUtils.getPropDefault(HTTP_VERSION_PROPERTY, HTTPConstants.HTTP_1_1));
+    }
+
+    /**
+     * Maps the legacy values {@code 1.0} and {@code 1.1} of the {@code httpclient.version} property,
+     * which the AJP sampler still understands, to {@code HTTP/1.1}, so that a configuration written
+     * for the old meaning of the property keeps selecting HTTP/1.1 instead of an unknown version.
+     *
+     * @param httpVersion value of the {@code httpclient.version} property, may be {@code null}
+     * @return the HTTP version as used by the {@code HTTPSampler.httpVersion} sampler property
+     */
+    static String normalizeHttpVersion(String httpVersion) {
+        String version = httpVersion == null ? "" : httpVersion.trim();
+        if ("1.0".equals(version) || "1.1".equals(version)) { // $NON-NLS-1$ $NON-NLS-2$
+            return HTTPConstants.HTTP_1_1;
+        }
+        return version;
+    }
 
     protected HTTPAbstractImpl(HTTPSamplerBase testElement){
         this.testElement = testElement;
@@ -230,24 +265,19 @@ public abstract class HTTPAbstractImpl implements Interruptible, HTTPConstantsIn
      * @throws UnknownHostException if the hostname/ip for {@link #getIpSource()} could not be resolved or not interface was found for it
      * @throws SocketException if an I/O error occurs
      */
+    @SuppressWarnings("EnumOrdinal")
     protected InetAddress getIpSourceAddress() throws UnknownHostException, SocketException {
         final String ipSource = getIpSource();
-        if (ipSource.trim().length() > 0) {
+        if (!ipSource.isBlank()) {
             Class<? extends InetAddress> ipClass = null;
             final SourceType sourceType = HTTPSamplerBase.SourceType.values()[testElement.getIpSourceType()];
             switch (sourceType) {
-            case DEVICE:
-                ipClass = InetAddress.class;
-                break;
-            case DEVICE_IPV4:
-                ipClass = Inet4Address.class;
-                break;
-            case DEVICE_IPV6:
-                ipClass = Inet6Address.class;
-                break;
-            case HOSTNAME:
-            default:
-                return InetAddress.getByName(ipSource);
+                case DEVICE -> ipClass = InetAddress.class;
+                case DEVICE_IPV4 -> ipClass = Inet4Address.class;
+                case DEVICE_IPV6 -> ipClass = Inet6Address.class;
+                case HOSTNAME -> {
+                    return InetAddress.getByName(ipSource);
+                }
             }
 
             NetworkInterface net = NetworkInterface.getByName(ipSource);
@@ -581,25 +611,23 @@ public abstract class HTTPAbstractImpl implements Interruptible, HTTPConstantsIn
      * @return HTTPSampleResult
      */
     protected HTTPSampleResult updateSampleResultForResourceInCache(HTTPSampleResult res) {
-        switch (CACHED_RESOURCE_MODE) {
-            case RETURN_NO_SAMPLE:
-                return null;
-            case RETURN_200_CACHE:
+        return switch (CACHED_RESOURCE_MODE) {
+            case RETURN_NO_SAMPLE -> null;
+            case RETURN_200_CACHE -> {
                 res.sampleEnd();
                 res.setResponseCodeOK();
                 res.setResponseMessage(RETURN_200_CACHE_MESSAGE);
                 res.setSuccessful(true);
-                return res;
-            case RETURN_CUSTOM_STATUS:
+                yield res;
+            }
+            case RETURN_CUSTOM_STATUS -> {
                 res.sampleEnd();
                 res.setResponseCode(RETURN_CUSTOM_STATUS_CODE);
                 res.setResponseMessage(RETURN_CUSTOM_STATUS_MESSAGE);
                 res.setSuccessful(true);
-                return res;
-            default:
-                // Cannot happen
-                throw new IllegalStateException("Unknown CACHED_RESOURCE_MODE");
-        }
+                yield res;
+            }
+        };
     }
 
     protected final void configureSampleLabel(SampleResult res, URL url) {

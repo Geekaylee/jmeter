@@ -21,9 +21,9 @@ import java.io.Serializable;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.PatternSyntaxException;
 import java.util.stream.Collectors;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.assertions.gui.AssertionGui;
 import org.apache.jmeter.samplers.SampleResult;
 import org.apache.jmeter.testelement.AbstractScopedAssertion;
@@ -34,6 +34,7 @@ import org.apache.jmeter.testelement.property.NullProperty;
 import org.apache.jmeter.testelement.property.StringProperty;
 import org.apache.jmeter.util.Document;
 import org.apache.jmeter.util.JMeterUtils;
+import org.apache.jorphan.util.StringUtilities;
 import org.apache.oro.text.MalformedCachePatternException;
 import org.apache.oro.text.regex.Pattern;
 import org.apache.oro.text.regex.Perl5Compiler;
@@ -93,6 +94,9 @@ public class ResponseAssertion extends AbstractScopedAssertion implements Serial
             = JMeterUtils.getPropDefault("assertion.equals_diff_delta_start", "[[[");
     private static final String DIFF_DELTA_END
             = JMeterUtils.getPropDefault("assertion.equals_diff_delta_end", "]]]");
+
+    private static final boolean USE_JAVA_REGEX = !JMeterUtils.getPropDefault(
+            "jmeter.regex.engine", "oro").equalsIgnoreCase("oro");
 
     public ResponseAssertion() {
         setProperty(new CollectionProperty(TEST_STRINGS, new ArrayList<String>()));
@@ -305,11 +309,10 @@ public class ResponseAssertion extends AbstractScopedAssertion implements Serial
         boolean contains = isContainsType(); // do it once outside loop
         boolean equals = isEqualsType();
         boolean substring = isSubstringType();
-        boolean matches = isMatchType();
 
         log.debug("Test Type Info: contains={}, notTest={}, orTest={}", contains, notTest, orTest);
 
-        if (StringUtils.isEmpty(toCheck)) {
+        if (StringUtilities.isEmpty(toCheck)) {
             if (notTest) { // Not should always succeed against an empty result
                 return result;
             }
@@ -326,19 +329,27 @@ public class ResponseAssertion extends AbstractScopedAssertion implements Serial
             List<String> allCheckMessage = new ArrayList<>();
             for (JMeterProperty jMeterProperty : getTestStrings()) {
                 String stringPattern = jMeterProperty.getStringValue();
-                Pattern pattern = null;
-                if (contains || matches) {
-                    pattern = JMeterUtils.getPatternCache().getPattern(stringPattern, Perl5Compiler.READ_ONLY_MASK);
-                }
                 boolean found;
                 if (contains) {
-                    found = localMatcher.contains(toCheck, pattern);
+                    if (USE_JAVA_REGEX) {
+                        found = containsWithJavaRegex(toCheck, stringPattern);
+                    } else {
+                        Pattern pattern = JMeterUtils.getPatternCache()
+                                .getPattern(stringPattern, Perl5Compiler.READ_ONLY_MASK);
+                        found = localMatcher.contains(toCheck, pattern);
+                    }
                 } else if (equals) {
                     found = toCheck.equals(stringPattern);
                 } else if (substring) {
                     found = toCheck.contains(stringPattern);
-                } else {
-                    found = localMatcher.matches(toCheck, pattern);
+                } else { // this is the old `matches` part which means `isMatchType()` is true
+                    if (USE_JAVA_REGEX) {
+                        found = matchesWithJavaRegex(toCheck, stringPattern);
+                    } else {
+                        Pattern pattern = JMeterUtils.getPatternCache()
+                                .getPattern(stringPattern, Perl5Compiler.READ_ONLY_MASK);
+                        found = localMatcher.matches(toCheck, pattern);
+                    }
                 }
                 boolean pass = notTest ? !found : found;
                 if (orTest) {
@@ -354,7 +365,7 @@ public class ResponseAssertion extends AbstractScopedAssertion implements Serial
                         log.debug("Failed: {}", stringPattern);
                         result.setFailure(true);
                         String customMsg = getCustomFailureMessage();
-                        if (StringUtils.isEmpty(customMsg)) {
+                        if (StringUtilities.isEmpty(customMsg)) {
                             result.setFailureMessage(getFailText(stringPattern, toCheck));
                         } else {
                             result.setFailureMessage(customMsg);
@@ -367,7 +378,7 @@ public class ResponseAssertion extends AbstractScopedAssertion implements Serial
             if (orTest && !hasTrue){
                 result.setFailure(true);
                 String customMsg = getCustomFailureMessage();
-                if (StringUtils.isEmpty(customMsg)) {
+                if (StringUtilities.isEmpty(customMsg)) {
                     result.setFailureMessage(
                             allCheckMessage.stream()
                                     .collect(Collectors.joining("\t", "", "\t")));
@@ -375,12 +386,20 @@ public class ResponseAssertion extends AbstractScopedAssertion implements Serial
                     result.setFailureMessage(customMsg);
                 }
             }
-        } catch (MalformedCachePatternException e) {
+        } catch (MalformedCachePatternException | PatternSyntaxException e) {
             result.setError(true);
             result.setFailure(false);
             result.setFailureMessage("Bad test configuration " + e);
         }
         return result;
+    }
+
+    private static boolean matchesWithJavaRegex(String toCheck, String stringPattern) {
+        return JMeterUtils.compilePattern(stringPattern).matcher(toCheck).matches();
+    }
+
+    private static boolean containsWithJavaRegex(String toCheck, String stringPattern) {
+        return JMeterUtils.compilePattern(stringPattern).matcher(toCheck).find();
     }
 
     private String getStringToCheck(SampleResult response) {
@@ -444,30 +463,16 @@ public class ResponseAssertion extends AbstractScopedAssertion implements Serial
             sb.append("URL");
         }
 
-        switch (getTestType()) {
-        case CONTAINS:
-        case SUBSTRING:
-            sb.append(" expected to contain ");
-            break;
-        case NOT | CONTAINS:
-        case NOT | SUBSTRING:
-            sb.append(" expected not to contain ");
-            break;
-        case MATCH:
-            sb.append(" expected to match ");
-            break;
-        case NOT | MATCH:
-            sb.append(" expected not to match ");
-            break;
-        case EQUALS:
-            sb.append(" expected to equal ");
-            break;
-        case NOT | EQUALS:
-            sb.append(" expected not to equal ");
-            break;
-        default:// should never happen...
-            sb.append(" expected something using ");
-        }
+        sb.append(switch (getTestType()) {
+            case CONTAINS, SUBSTRING -> " expected to contain ";
+            case NOT | CONTAINS, NOT | SUBSTRING -> " expected not to contain ";
+            case MATCH -> " expected to match ";
+            case NOT | MATCH -> " expected not to match ";
+            case EQUALS -> " expected to equal ";
+            case NOT | EQUALS -> " expected not to equal ";
+            default ->// should never happen...
+                    " expected something using ";
+        });
 
         sb.append("/");
 
@@ -533,7 +538,7 @@ public class ResponseAssertion extends AbstractScopedAssertion implements Serial
         String compDeltaSeq;
         String endingEqSeq = trunc(true, received.substring(lastRecDiff + 1, recLength));
         String                  recDeltaSeq;
-        if (endingEqSeq.length() == 0) {
+        if (endingEqSeq.isEmpty()) {
             recDeltaSeq = trunc(true, received.substring(firstDiff, recLength));
             compDeltaSeq = trunc(true, comparison.substring(firstDiff, compLength));
         } else {

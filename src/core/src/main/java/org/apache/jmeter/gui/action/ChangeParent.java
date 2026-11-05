@@ -27,7 +27,6 @@ import javax.swing.JTree;
 import javax.swing.tree.TreeNode;
 import javax.swing.tree.TreePath;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.control.Controller;
 import org.apache.jmeter.gui.GuiPackage;
 import org.apache.jmeter.gui.JMeterGUIComponent;
@@ -35,12 +34,16 @@ import org.apache.jmeter.gui.tree.JMeterTreeModel;
 import org.apache.jmeter.gui.tree.JMeterTreeNode;
 import org.apache.jmeter.testelement.TestElement;
 import org.apache.jmeter.util.JMeterUtils;
+import org.apache.jorphan.util.StringUtilities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.auto.service.AutoService;
 
 /**
  * Allows to change Controller implementation
  */
+@AutoService(Command.class)
 public class ChangeParent extends AbstractAction {
     private static final Logger log = LoggerFactory.getLogger(ChangeParent.class);
 
@@ -78,13 +81,13 @@ public class ChangeParent extends AbstractAction {
         return commands;
     }
 
-    private void changeParent(TestElement newParent, GuiPackage guiPackage, JMeterTreeNode currentNode) {
+    private static void changeParent(TestElement newParent, GuiPackage guiPackage, JMeterTreeNode currentNode) {
 
         // keep the old name if it was not the default one
         Controller currentController = (Controller) currentNode.getUserObject();
         JMeterGUIComponent currentGui = guiPackage.getCurrentGui();
         String defaultName = JMeterUtils.getResString(currentGui.getLabelResource());
-        if(StringUtils.isNotBlank(currentController.getName())
+        if (StringUtilities.isNotBlank(currentController.getName())
                 && !currentController.getName().equals(defaultName)){
             newParent.setName(currentController.getName());
         }

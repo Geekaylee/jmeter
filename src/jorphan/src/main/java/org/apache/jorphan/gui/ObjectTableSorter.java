@@ -31,7 +31,6 @@ import java.util.stream.Stream;
 import javax.swing.RowSorter;
 import javax.swing.SortOrder;
 
-import org.apache.commons.lang3.ObjectUtils;
 
 /**
  * Implementation of a {@link RowSorter} for {@link ObjectTableModel}
@@ -44,7 +43,7 @@ public class ObjectTableSorter extends RowSorter<ObjectTableModel> {
      * View row with model mapping. All data relates to model.
      */
     public class Row {
-        private int index;
+        private final int index;
 
         protected Row(int index) {
             this.index = index;
@@ -74,15 +73,15 @@ public class ObjectTableSorter extends RowSorter<ObjectTableModel> {
         }
     }
 
-    private ObjectTableModel model;
+    private final ObjectTableModel model;
     private SortKey sortkey;
 
     private Comparator<Row> comparator  = null;
-    private ArrayList<Row>  viewToModel = new ArrayList<>();
+    private final ArrayList<Row>  viewToModel = new ArrayList<>();
     private int[]           modelToView = new int[0];
 
     private Comparator<Row>  primaryComparator = null;
-    private Comparator<?>[]  valueComparators;
+    private final Comparator<?>[]  valueComparators;
     private Comparator<Row>  fallbackComparator;
 
     public ObjectTableSorter(ObjectTableModel model) {
@@ -148,7 +147,7 @@ public class ObjectTableSorter extends RowSorter<ObjectTableModel> {
      */
     public ObjectTableSorter setValueComparator(int column, Comparator<?> comparator) {
         invalidate();
-        valueComparators[column] = ObjectUtils.defaultIfNull(comparator, getDefaultComparator(column));
+        valueComparators[column] = comparator != null ? comparator : getDefaultComparator(column);
         return this;
     }
 
@@ -185,7 +184,7 @@ public class ObjectTableSorter extends RowSorter<ObjectTableModel> {
      */
     public ObjectTableSorter setFallbackComparator(Comparator<Row> comparator) {
         invalidate();
-        fallbackComparator = ObjectUtils.defaultIfNull(comparator, Comparator.comparingInt(Row::getIndex));
+        fallbackComparator = Objects.requireNonNullElse(comparator, Comparator.comparingInt(Row::getIndex));
         return this;
     }
 
@@ -228,14 +227,9 @@ public class ObjectTableSorter extends RowSorter<ObjectTableModel> {
     @Override
     public void setSortKeys(List<? extends SortKey> keys) {
         switch (keys.size()) {
-            case 0:
-                setSortKey(null);
-                break;
-            case 1:
-                setSortKey(keys.get(0));
-                break;
-            default:
-                throw new IllegalArgumentException("Only one column can be sorted");
+            case 0 -> setSortKey(null);
+            case 1 -> setSortKey(keys.get(0));
+            default -> throw new IllegalArgumentException("Only one column can be sorted");
         }
     }
 

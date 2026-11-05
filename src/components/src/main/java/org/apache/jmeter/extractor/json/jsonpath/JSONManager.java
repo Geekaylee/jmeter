@@ -88,14 +88,14 @@ public class JSONManager {
     }
 
     @SuppressWarnings("unchecked")
-    private String stringifyJSONObject(Object obj) {
+    private static String stringifyJSONObject(Object obj) {
         if (obj instanceof Map) {
             return new JSONObject((Map<String, ?>) obj).toJSONString();
         }
-        if (obj instanceof JSONArray) {
-            return ((JSONArray)obj).toJSONString();
+        if (obj instanceof JSONArray objects) {
+            return objects.toJSONString();
         }
-        return obj == null ? "" : obj.toString(); //$NON-NLS-1$
+        return obj == null ? null : obj.toString();
     }
 
 }

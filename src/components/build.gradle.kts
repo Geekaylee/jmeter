@@ -15,16 +15,24 @@
  * limitations under the License.
  */
 
+plugins {
+    id("java-test-fixtures")
+    id("build-logic.build-params")
+    id("build-logic.jvm-published-library")
+}
+
 dependencies {
-    api(project(":src:core"))
-    testImplementation(project(":src:core", "testClasses"))
+    api(projects.src.core)
+    testImplementation(testFixtures(projects.src.core))
 
     api("org.apache-extras.beanshell:bsh") {
-        because("""
+        because(
+            """
             BeanShell is not required for JMeter, however it is commonly used in the jmx scripts.
             New scripts should refrain from using BeanShell though and migrate to Groovy or other
             faster engines
-        """.trimIndent())
+            """.trimIndent()
+        )
     }
 
     api("javax.mail:mail") {
@@ -43,56 +51,40 @@ dependencies {
     implementation("net.minidev:json-smart")
     implementation("net.minidev:accessors-smart")
     implementation("org.apache.commons:commons-pool2")
-    implementation("commons-codec:commons-codec")
     implementation("org.ow2.asm:asm")
-    implementation("org.jodd:jodd-log")
-    implementation("org.jodd:jodd-lagarto")
+    implementation("org.jodd:jodd-log") {
+        exclude("ch.qos.logback")
+        exclude("commons-logging")
+        exclude("org.apache.logging.log4j")
+    }
+    implementation("org.jodd:jodd-lagarto") {
+        exclude("ch.qos.logback")
+        exclude("commons-logging")
+        exclude("org.apache.logging.log4j")
+    }
     implementation("com.jayway.jsonpath:json-path")
     implementation("org.apache.httpcomponents:httpasyncclient")
     implementation("org.apache.httpcomponents:httpcore-nio")
     implementation("org.jsoup:jsoup")
-    implementation("org.apache.commons:commons-lang3")
     implementation("net.sf.jtidy:jtidy")
-    implementation("org.apache.commons:commons-collections4")
     implementation("org.apache.commons:commons-math3")
-    implementation("commons-io:commons-io") {
-        because("IOUtils")
-    }
-    implementation("org.apache.commons:commons-text") {
-        because("StringEscapeUtils")
-    }
+    implementation("org.unbescape:unbescape")
     implementation("com.miglayout:miglayout-swing")
     // we use bcmail for compilation only, and bcmail is not shipped in the release
-    compileOnly("org.bouncycastle:bcmail-jdk15on")
-    compileOnly("org.bouncycastle:bcpkix-jdk15on")
-    compileOnly("org.bouncycastle:bcprov-jdk15on")
+    compileOnly("org.bouncycastle:bcmail-jdk18on")
+    compileOnly("org.bouncycastle:bcpkix-jdk18on")
+    compileOnly("org.bouncycastle:bcprov-jdk18on")
     // Certain tests use bouncycastle, so it is added to test classpath
-    testRuntimeOnly("org.bouncycastle:bcmail-jdk15on")
-    testRuntimeOnly("org.bouncycastle:bcpkix-jdk15on")
-    testRuntimeOnly("org.bouncycastle:bcprov-jdk15on")
+    testRuntimeOnly("org.bouncycastle:bcmail-jdk18on")
+    testRuntimeOnly("org.bouncycastle:bcpkix-jdk18on")
+    testRuntimeOnly("org.bouncycastle:bcprov-jdk18on")
     testImplementation("nl.jqno.equalsverifier:equalsverifier")
-    testImplementation(testFixtures(project(":src:testkit-wiremock")))
+    testImplementation(testFixtures(projects.src.testkitWiremock))
+    testFixturesImplementation(testFixtures(projects.src.core))
+    testImplementation("io.mockk:mockk")
 }
 
-fun String?.toBool(nullAs: Boolean, blankAs: Boolean, default: Boolean) =
-    when {
-        this == null -> nullAs
-        isBlank() -> blankAs
-        default -> !equals("false", ignoreCase = true)
-        else -> equals("true", ignoreCase = true)
-    }
-
-fun classExists(name: String) =
-    try {
-        Class.forName(name)
-        true
-    } catch (e: Throwable) {
-        false
-    }
-
-if (!(project.findProperty("enableJavaFx") as? String)
-        .toBool(nullAs = classExists("javafx.application.Platform"), blankAs = true, default = false)
-) {
+if (!buildParameters.enableJavaFx) {
     // JavaFX is not present in Maven Central, so exclude the file unless explicitly asked by
     // -PenableJavaFx
     logger.lifecycle("RenderInBrowser is excluded from compilation. If you want to compile it, add -PenableJavaFx")

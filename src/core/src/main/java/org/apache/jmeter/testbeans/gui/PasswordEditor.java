@@ -36,7 +36,7 @@ import javax.swing.JPasswordField;
  */
 public class PasswordEditor extends PropertyEditorSupport implements ActionListener, FocusListener {
 
-    private JPasswordField textField;
+    private final JPasswordField textField;
 
     /**
      * Value on which we started the editing. Used to avoid firing
@@ -70,8 +70,8 @@ public class PasswordEditor extends PropertyEditorSupport implements ActionListe
 
     @Override
     public void setValue(Object value) {
-        if (value instanceof String) {
-            setAsText((String) value);
+        if (value instanceof String string) {
+            setAsText(string);
         } else {
             throw new IllegalArgumentException();
         }

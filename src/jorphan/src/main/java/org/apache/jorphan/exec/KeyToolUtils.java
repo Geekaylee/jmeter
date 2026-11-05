@@ -23,14 +23,13 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.SystemUtils;
-import org.apache.commons.lang3.math.NumberUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,7 +52,7 @@ public class KeyToolUtils {
     /** Name of property that can be used to override the default keytool location */
     private static final String KEYTOOL_DIRECTORY = "keytool.directory"; // $NON-NLS-1$
 
-    private static final String DNAME_INTERMEDIATE_CA_KEY  = "cn=JMeter Intermediate CA for recording (INSTALL ONLY IF IT S YOURS)"; // $NON-NLS-1$
+    private static final String DNAME_INTERMEDIATE_CA_KEY  = "cn=JMeter Intermediate CA for recording (INSTALL ONLY IF IT IS YOURS)"; // $NON-NLS-1$
 
     public static final String ROOT_CACERT_CRT_PFX = "ApacheJMeterTemporaryRootCA"; // $NON-NLS-1$ (do not change)
     private static final String ROOT_CACERT_CRT = ROOT_CACERT_CRT_PFX + ".crt"; // $NON-NLS-1$ (Firefox and Windows)
@@ -73,7 +72,7 @@ public class KeyToolUtils {
     static {
         StringBuilder sb = new StringBuilder();
 
-        sb.append("CN=_ JMeter Root CA for recording (INSTALL ONLY IF IT S YOURS)"); // $NON-NLS-1$
+        sb.append("CN=_ JMeter Root CA for recording (INSTALL ONLY IF IT IS YOURS)"); // $NON-NLS-1$
         String userName = System.getProperty("user.name"); // $NON-NLS-1$
         userName = userName.replace('\\','/'); // Backslash is special (Bugzilla 56178)
         addElement(sb, "OU=Username: ", userName); // $NON-NLS-1$
@@ -94,8 +93,9 @@ public class KeyToolUtils {
         } else {
             keytoolPath = KEYTOOL;
             if (!checkKeytool(keytoolPath)) { // Not found on PATH, check Java Home
-                File javaHome = SystemUtils.getJavaHome();
-                if (javaHome != null) {
+                String javaHomePath = System.getProperty("java.home");
+                if (javaHomePath != null) {
+                    File javaHome = new File(javaHomePath);
                     keytoolPath = new File(new File(javaHome, "bin"), KEYTOOL).getPath(); // $NON-NLS-1$
                     if (!checkKeytool(keytoolPath)) {
                         keytoolPath = null;
@@ -145,6 +145,7 @@ public class KeyToolUtils {
         final SystemCommand nativeCommand = new SystemCommand(workingDir, null);
         final List<String> arguments = new ArrayList<>();
         arguments.add(getKeyToolPath());
+        arguments.add("-J-Xmx128m");
         arguments.add("-genkeypair"); // $NON-NLS-1$
         arguments.add("-alias"); // $NON-NLS-1$
         arguments.add(alias);
@@ -258,10 +259,10 @@ public class KeyToolUtils {
         // Export the Root CA for Firefox/Chrome/IE
         KeyToolUtils.keytool("-exportcert", keystore, password, ROOTCA_ALIAS, null, null, "-rfc", "-file", ROOT_CACERT_CRT);
         // Copy for Opera
-        if(caCertCrt.exists() && caCertCrt.canRead()) {
-            FileUtils.copyFile(caCertCrt, caCertUsr);
+        if (caCertCrt.exists() && caCertCrt.canRead()) {
+            Files.copy(caCertCrt.toPath(), caCertUsr.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
         } else {
-            log.warn("Failed creating "+caCertCrt.getAbsolutePath()+", check 'keytool' utility in path is available and points to a JDK >= 7");
+            log.warn("Failed creating {}, check 'keytool' utility in path is available and points to a JDK >= 7", caCertCrt.getAbsolutePath());
         }
     }
 
@@ -313,7 +314,7 @@ public class KeyToolUtils {
      * @return a string that is safe to use as subject name
      */
     private static String guardSubjectName(String subject) {
-        if (NumberUtils.isDigits(subject.substring(0,1))) {
+        if (!subject.isEmpty() && Character.isDigit(subject.charAt(0))) {
             return "ip" + subject;
         }
         return subject;
@@ -327,7 +328,7 @@ public class KeyToolUtils {
      * @return prefixed extension
      */
     private static String chooseExtension(String subject) {
-        if (NumberUtils.isDigits(subject.substring(0,1))) {
+        if (!subject.isEmpty() && Character.isDigit(subject.charAt(0))) {
             return "ip:" + subject;
         }
         return "dns:" + subject;
@@ -350,6 +351,7 @@ public class KeyToolUtils {
         final SystemCommand nativeCommand = new SystemCommand(workingDir, null);
         final List<String> arguments = new ArrayList<>();
         arguments.add(getKeyToolPath());
+        arguments.add("-J-Xmx128m");
         arguments.add("-list"); // $NON-NLS-1$
         arguments.add("-v"); // $NON-NLS-1$
 
@@ -421,10 +423,14 @@ public class KeyToolUtils {
             InputStream input, OutputStream output, String ... parameters)
             throws IOException {
         final File workingDir = keystore.getParentFile();
+        ByteArrayOutputStream stdErr = new ByteArrayOutputStream();
+        // If we omit stderr, then SystemCommand redirects stderr to stdout, and it might break keytool output
+        // with message like "Picked up _JAVA_OPTIONS: ..."
         final SystemCommand nativeCommand =
-                new SystemCommand(workingDir, 0L, 0, null, input, output, null);
+                new SystemCommand(workingDir, 0L, 0, null, input, output, stdErr);
         final List<String> arguments = new ArrayList<>();
         arguments.add(getKeyToolPath());
+        arguments.add("-J-Xmx128m");
         arguments.add(command);
         arguments.add("-keystore"); // $NON-NLS-1$
         arguments.add(keystore.getName());
@@ -436,7 +442,14 @@ public class KeyToolUtils {
         arguments.add(alias);
         Collections.addAll(arguments, parameters);
 
-        runNativeCommand(nativeCommand, arguments);
+        try {
+            runNativeCommand(nativeCommand, arguments);
+        } catch (IOException e) {
+            if (stdErr.size() > 0) {
+                e.addSuppressed(new IOException("standard error (stderr) was: " + stdErr));
+            }
+            throw e;
+        }
     }
 
     /**
@@ -469,6 +482,7 @@ public class KeyToolUtils {
         final SystemCommand nativeCommand = new SystemCommand(null, null);
         final List<String> arguments = new ArrayList<>();
         arguments.add(keytoolPath);
+        arguments.add("-J-Xmx128m");
         arguments.add("-help"); // $NON-NLS-1$
         try {
             int status = nativeCommand.run(arguments);

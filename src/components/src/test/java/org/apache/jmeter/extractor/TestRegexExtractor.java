@@ -18,12 +18,11 @@
 package org.apache.jmeter.extractor;
 
 
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URL;
 
@@ -31,7 +30,6 @@ import org.apache.jmeter.samplers.SampleResult;
 import org.apache.jmeter.threads.JMeterContext;
 import org.apache.jmeter.threads.JMeterContextService;
 import org.apache.jmeter.threads.JMeterVariables;
-import org.hamcrest.CoreMatchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -50,13 +48,14 @@ public class TestRegexExtractor {
         extractor.setThreadContext(jmctx);
         extractor.setRefName("regVal");
         result = new SampleResult();
-        String data = "<company-xmlext-query-ret><row><value field=\"RetCode\">LIS_OK</value>\n" +
-                "<value field=\"RetCodeExtension\"></value><value field=\"alias\"></value>\n" +
-                "<value field=\"positioncount\"></value><value field=\"invalidpincount\">0</value>\n" +
-                "<value field=\"pinposition1\">1</value><value field=\"pinpositionvalue1\"></value>\n" +
-                "<value field=\"pinposition2\">5</value><value field=\"pinpositionvalue2\"></value>\n" +
-                "<value field=\"pinposition3\">6</value><value field=\"pinpositionvalue3\"></value>\n" +
-                "</row></company-xmlext-query-ret>";
+        String data = """
+                <company-xmlext-query-ret><row><value field="RetCode">LIS_OK</value>
+                <value field="RetCodeExtension"></value><value field="alias"></value>
+                <value field="positioncount"></value><value field="invalidpincount">0</value>
+                <value field="pinposition1">1</value><value field="pinpositionvalue1"></value>
+                <value field="pinposition2">5</value><value field="pinpositionvalue2"></value>
+                <value field="pinposition3">6</value><value field="pinpositionvalue3"></value>
+                </row></company-xmlext-query-ret>""";
         result.setResponseData(data, null);
         result.setResponseHeaders("Header1: Value1\nHeader2: Value2");
         result.setResponseCode("abcd");
@@ -76,9 +75,9 @@ public class TestRegexExtractor {
         extractor.setThreadContext(jmctx);
         extractor.setTemplate("$1$");
         extractor.process();
-        assertThat(vars.get("varname"), CoreMatchers.is(CoreMatchers.nullValue()));
-        assertThat(vars.get("varname_1"), CoreMatchers.is("one"));
-        assertThat(vars.get("varname_matchNr"), CoreMatchers.is("1"));
+        assertNull(vars.get("varname"));
+        assertEquals("one", vars.get("varname_1"));
+        assertEquals("1", vars.get("varname_matchNr"));
     }
 
     @Test
@@ -91,10 +90,10 @@ public class TestRegexExtractor {
         extractor.setThreadContext(jmctx);
         extractor.setTemplate("$1$");
         extractor.process();
-        assertThat(vars.get("varname"), CoreMatchers.is(CoreMatchers.nullValue()));
-        assertThat(vars.get("varname_1"), CoreMatchers.is("one"));
-        assertThat(vars.get("varname_2"), CoreMatchers.is("two"));
-        assertThat(vars.get("varname_matchNr"), CoreMatchers.is("2"));
+        assertNull(vars.get("varname"));
+        assertEquals("one", vars.get("varname_1"));
+        assertEquals("two", vars.get("varname_2"));
+        assertEquals("2", vars.get("varname_matchNr"));
     }
 
     @Test
@@ -258,26 +257,26 @@ public class TestRegexExtractor {
         assertEquals("position", vars.get("regVal_1"));
         assertEquals("1", vars.get("regVal_1_g"));
         assertEquals("position", vars.get("regVal_1_g1"));
-        assertNull("Unused variables should be null", vars.get("regVal_1_g2"));
+        assertNull(vars.get("regVal_1_g2"), "Unused variables should be null");
         assertEquals("invalidpin", vars.get("regVal_2"));
         assertEquals("1", vars.get("regVal_2_g"));
         assertEquals("invalidpin", vars.get("regVal_2_g1"));
-        assertNull("Unused variables should be null", vars.get("regVal_2_g2"));
+        assertNull(vars.get("regVal_2_g2"), "Unused variables should be null");
         assertEquals("1", vars.get("regVal_1_g"));
-        assertNull("Unused variables should be null", vars.get("regVal_3"));
-        assertNull("Unused variables should be null", vars.get("regVal_3_g"));
-        assertNull("Unused variables should be null", vars.get("regVal_3_g0"));
-        assertNull("Unused variables should be null", vars.get("regVal_3_g1"));
-        assertNull("Unused variables should be null", vars.get("regVal_3_g2"));
+        assertNull(vars.get("regVal_3"), "Unused variables should be null");
+        assertNull(vars.get("regVal_3_g"), "Unused variables should be null");
+        assertNull(vars.get("regVal_3_g0"), "Unused variables should be null");
+        assertNull(vars.get("regVal_3_g1"), "Unused variables should be null");
+        assertNull(vars.get("regVal_3_g2"), "Unused variables should be null");
 
         // Check when match fails
         extractor.setRegex("xxxx(.)(.)");
         extractor.process();
         assertEquals("0", vars.get("regVal_matchNr"));
-        assertNull("Unused variables should be null", vars.get("regVal_1"));
-        assertNull("Unused variables should be null", vars.get("regVal_1_g0"));
-        assertNull("Unused variables should be null", vars.get("regVal_1_g1"));
-        assertNull("Unused variables should be null", vars.get("regVal_1_g2"));
+        assertNull(vars.get("regVal_1"), "Unused variables should be null");
+        assertNull(vars.get("regVal_1_g0"), "Unused variables should be null");
+        assertNull(vars.get("regVal_1_g1"), "Unused variables should be null");
+        assertNull(vars.get("regVal_1_g2"), "Unused variables should be null");
     }
 
     @Test
@@ -285,23 +284,23 @@ public class TestRegexExtractor {
         extractor.setRegex("Header1: (\\S+)");
         extractor.setTemplate("$1$");
         extractor.setMatchNumber(1);
-        assertTrue("useBody should be true", extractor.useBody());
-        assertFalse("useHdrs should be false", extractor.useHeaders());
-        assertFalse("useURL should be false", extractor.useUrl());
+        assertTrue(extractor.useBody(), "useBody should be true");
+        assertFalse(extractor.useHeaders(), "useHdrs should be false");
+        assertFalse(extractor.useUrl(), "useURL should be false");
         extractor.setUseField(RegexExtractor.USE_BODY);
-        assertTrue("useBody should be true", extractor.useBody());
-        assertFalse("useHdrs should be false", extractor.useHeaders());
-        assertFalse("useURL should be false", extractor.useUrl());
+        assertTrue(extractor.useBody(), "useBody should be true");
+        assertFalse(extractor.useHeaders(), "useHdrs should be false");
+        assertFalse(extractor.useUrl(), "useURL should be false");
         extractor.setUseField(RegexExtractor.USE_HDRS);
-        assertTrue("useHdrs should be true", extractor.useHeaders());
-        assertFalse("useBody should be false", extractor.useBody());
-        assertFalse("useURL should be false", extractor.useUrl());
+        assertTrue(extractor.useHeaders(), "useHdrs should be true");
+        assertFalse(extractor.useBody(), "useBody should be false");
+        assertFalse(extractor.useUrl(), "useURL should be false");
         extractor.process();
         assertEquals("Value1", vars.get("regVal"));
         extractor.setUseField(RegexExtractor.USE_URL);
-        assertFalse("useHdrs should be false", extractor.useHeaders());
-        assertFalse("useBody should be false", extractor.useBody());
-        assertTrue("useURL should be true", extractor.useUrl());
+        assertFalse(extractor.useHeaders(), "useHdrs should be false");
+        assertFalse(extractor.useBody(), "useBody should be false");
+        assertTrue(extractor.useUrl(), "useURL should be true");
     }
 
     @Test
@@ -310,9 +309,9 @@ public class TestRegexExtractor {
         extractor.setTemplate("$1$");
         extractor.setMatchNumber(1);
         extractor.setUseField(RegexExtractor.USE_URL);
-        assertFalse("useHdrs should be false", extractor.useHeaders());
-        assertFalse("useBody should be false", extractor.useBody());
-        assertTrue("useURL should be true", extractor.useUrl());
+        assertFalse(extractor.useHeaders(), "useHdrs should be false");
+        assertFalse(extractor.useBody(), "useBody should be false");
+        assertTrue(extractor.useUrl(), "useURL should be true");
         extractor.process();
         assertNull(vars.get("regVal"));
         result.setURL(new URL("http://jakarta.apache.org/index.html?abcd"));
@@ -326,19 +325,19 @@ public class TestRegexExtractor {
         extractor.setTemplate("$1$");
         extractor.setMatchNumber(1);
         extractor.setUseField(RegexExtractor.USE_CODE);
-        assertFalse("useHdrs should be false", extractor.useHeaders());
-        assertFalse("useBody should be false", extractor.useBody());
-        assertFalse("useURL should be false", extractor.useUrl());
-        assertFalse("useMessage should be false", extractor.useMessage());
-        assertTrue("useCode should be true", extractor.useCode());
+        assertFalse(extractor.useHeaders(), "useHdrs should be false");
+        assertFalse(extractor.useBody(), "useBody should be false");
+        assertFalse(extractor.useUrl(), "useURL should be false");
+        assertFalse(extractor.useMessage(), "useMessage should be false");
+        assertTrue(extractor.useCode(), "useCode should be true");
         extractor.process();
         assertEquals("abcd", vars.get("regVal"));
         extractor.setUseField(RegexExtractor.USE_MESSAGE);
-        assertFalse("useHdrs should be false", extractor.useHeaders());
-        assertFalse("useBody should be false", extractor.useBody());
-        assertFalse("useURL should be false", extractor.useUrl());
-        assertTrue("useMessage should be true", extractor.useMessage());
-        assertFalse("useCode should be false", extractor.useCode());
+        assertFalse(extractor.useHeaders(), "useHdrs should be false");
+        assertFalse(extractor.useBody(), "useBody should be false");
+        assertFalse(extractor.useUrl(), "useURL should be false");
+        assertTrue(extractor.useMessage(), "useMessage should be true");
+        assertFalse(extractor.useCode(), "useCode should be false");
         extractor.setMatchNumber(3);
         extractor.process();
         assertEquals("brown", vars.get("regVal"));

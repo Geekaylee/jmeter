@@ -26,12 +26,16 @@ import org.apache.jmeter.samplers.SampleResult;
 import org.apache.jmeter.samplers.Sampler;
 import org.apache.jmeter.threads.JMeterVariables;
 import org.apache.jmeter.util.JMeterUtils;
+import org.apache.jorphan.util.StringUtilities;
+
+import com.google.auto.service.AutoService;
 
 /**
  * Provides a longSum function that adds two or more long values.
  * @see IntSum
  * @since 2.3.2
  */
+@AutoService(Function.class)
 public class LongSum extends AbstractFunction {
 
     private static final List<String> desc = new ArrayList<>();
@@ -76,7 +80,7 @@ public class LongSum extends AbstractFunction {
         }
 
         String totalString = Long.toString(sum);
-        if (vars != null && varName != null && varName.length() > 0){// vars will be null on TestPlan
+        if (vars != null && StringUtilities.isNotEmpty(varName)){// vars will be null on TestPlan
             vars.put(varName, totalString);
         }
 

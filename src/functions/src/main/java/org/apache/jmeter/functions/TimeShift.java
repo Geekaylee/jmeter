@@ -31,18 +31,19 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 
-import org.apache.commons.lang3.LocaleUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.engine.util.CompoundVariable;
 import org.apache.jmeter.samplers.SampleResult;
 import org.apache.jmeter.samplers.Sampler;
 import org.apache.jmeter.threads.JMeterVariables;
 import org.apache.jmeter.util.JMeterUtils;
+import org.apache.jorphan.locale.LocaleUtils;
+import org.apache.jorphan.util.StringUtilities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.google.auto.service.AutoService;
 
 /**
  * timeShifting Function permit to shift a date
@@ -65,6 +66,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
  *
  * @since 3.3
  */
+@AutoService(Function.class)
 public class TimeShift extends AbstractFunction {
     private static final Logger log = LoggerFactory.getLogger(TimeShift.class);
 
@@ -80,24 +82,24 @@ public class TimeShift extends AbstractFunction {
     private CompoundVariable amountToShiftCompound; // $NON-NLS-1$
     private Locale locale = JMeterUtils.getLocale(); // $NON-NLS-1$
     private String variableName = ""; //$NON-NLS-1$
-    private ZoneId systemDefaultZoneID = ZoneId.systemDefault();
+    private static final ZoneId systemDefaultZoneID = ZoneId.systemDefault();
 
 
     private static final class LocaleFormatObject {
 
-        private String format;
-        private Locale locale;
+        private final String format;
+        private final Locale locale;
 
-        public LocaleFormatObject(String format, Locale locale) {
+        private LocaleFormatObject(String format, Locale locale) {
             this.format = format;
             this.locale = locale;
         }
 
-        public String getFormat() {
+        private String getFormat() {
             return format;
         }
 
-        public Locale getLocale() {
+        private Locale getLocale() {
             return locale;
         }
 
@@ -108,11 +110,10 @@ public class TimeShift extends AbstractFunction {
 
         @Override
         public boolean equals(Object other) {
-            if (!(other instanceof LocaleFormatObject)) {
+            if (!(other instanceof LocaleFormatObject otherError)) {
                 return false;
             }
 
-            LocaleFormatObject otherError = (LocaleFormatObject) other;
             return format.equals(otherError.getFormat())
                     && locale.getDisplayName().equals(otherError.getLocale().getDisplayName());
         }
@@ -143,10 +144,10 @@ public class TimeShift extends AbstractFunction {
         ZonedDateTime zonedDateTimeToShift = ZonedDateTime.now(systemDefaultZoneID);
 
         DateTimeFormatter formatter = null;
-        if (!StringUtils.isEmpty(format)) {
+        if (StringUtilities.isNotEmpty(format)) {
             try {
                 LocaleFormatObject lfo = new LocaleFormatObject(format, locale);
-                formatter = dateTimeFormatterCache.get(lfo, this::createFormatter);
+                formatter = dateTimeFormatterCache.get(lfo, TimeShift::createFormatter);
             } catch (IllegalArgumentException ex) {
                 log.error("Format date pattern '{}' is invalid "
                         + "(see https://docs.oracle.com/javase/8/docs/api/java/time/format/DateTimeFormatter.html)",
@@ -170,7 +171,7 @@ public class TimeShift extends AbstractFunction {
         }
 
         // Check amount value to shift
-        if (!StringUtils.isEmpty(amountToShift)) {
+        if (StringUtilities.isNotEmpty(amountToShift)) {
             try {
                 Duration duration = Duration.parse(amountToShift);
                 zonedDateTimeToShift = zonedDateTimeToShift.plus(duration);
@@ -188,7 +189,7 @@ public class TimeShift extends AbstractFunction {
             dateString = String.valueOf(zonedDateTimeToShift.toInstant().toEpochMilli());
         }
 
-        if (!StringUtils.isEmpty(variableName)) {
+        if (StringUtilities.isNotEmpty(variableName)) {
             JMeterVariables vars = getVariables();
             if (vars != null) {// vars will be null on TestPlan
                 vars.put(variableName, dateString);
@@ -198,7 +199,7 @@ public class TimeShift extends AbstractFunction {
     }
 
     @SuppressWarnings("JavaTimeDefaultTimeZone")
-    private DateTimeFormatter createFormatter(LocaleFormatObject format) {
+    private static DateTimeFormatter createFormatter(LocaleFormatObject format) {
         log.debug("Create a new instance of DateTimeFormatter for format '{}' in the cache", format);
         return new DateTimeFormatterBuilder().appendPattern(format.getFormat())
                 .parseDefaulting(ChronoField.NANO_OF_SECOND, 0)
@@ -230,7 +231,7 @@ public class TimeShift extends AbstractFunction {
             variableName = ((CompoundVariable) values[3]).execute().trim();
         } else {
             String localeAsString = ((CompoundVariable) values[3]).execute().trim();
-            if (!localeAsString.trim().isEmpty()) {
+            if (!localeAsString.isEmpty()) {
                 locale = LocaleUtils.toLocale(localeAsString);
             }
             variableName = ((CompoundVariable) values[4]).execute().trim();

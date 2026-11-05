@@ -117,7 +117,7 @@ defined in the <code>system.properties</code> file or on the command-line. The
     JVM does not support the specified cipher suites, or if the cipher suites
     supported by the HTTPS server do not overlap this list.  See the
     <a href="https://docs.oracle.com/javase/8/docs/technotes/guides/security/jsse/JSSERefGuide.html#Customization">JSSE
-	    Reference Guide.</a><br/>
+    Reference Guide.</a><br/>
     For example: <source>https.cipherSuites=TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA384,TLS_RSA_WITH_AES_128_GCM_SHA256</source>
     If not specified, JMeter will use the default list of cipher suites
     supported by the JVM.
@@ -246,10 +246,6 @@ Defaults to: <code>true</code>
 </property>
 <property name="not_in_menu">
     Components to not display in JMeter GUI (GUI class name or static label).<br/>
-    These elements are deprecated and will be removed in next version:
-    <source>MongoDB Script, MongoDB Source Config</source>
-    Defaults to:
-    <source>org.apache.jmeter.protocol.mongodb.sampler.MongoScriptSampler, org.apache.jmeter.protocol.mongodb.config.MongoSourceElement</source>
 </property>
 <property name="undo.history.size">
     Number of items in undo history.<br/>
@@ -446,8 +442,87 @@ JMETER-SERVER</source>
     Defaults to: <code>0</code>
 </property>
 <property name="httpclient.version">
-    Set the http version.<br/>
-    Defaults to: <code>1.1</code> (or use the parameter <code>http.protocol.version</code>)
+    Set the default HTTP version for HttpClient5 samplers with an empty HTTP Version value.<br/>
+    Valid values are <code>HTTP/1.1</code>, <code>HTTP/2</code> and <code>HTTP/2 Strict</code>.
+    The legacy values <code>1.0</code> and <code>1.1</code> are still accepted and both select
+    <code>HTTP/1.1</code> for these samplers. The HttpClient4 and Java samplers always use
+    <code>HTTP/1.1</code>.<br/>
+    The AJP sampler only reads this property to choose the HTTP version of its request line: the
+    legacy value <code>1.0</code> (or <code>HTTP/1.0</code>) announces <code>HTTP/1.0</code>, every
+    other value announces <code>HTTP/1.1</code>.<br/>
+    Defaults to: <code>HTTP/1.1</code>
+</property>
+<property name="httpclient5.validate_after_inactivity">
+    Milliseconds of inactivity after which a pooled connection of the HttpClient5 sampler
+    implementation is re-validated before it is reused, using an HTTP/2 <code>PING</code> or a stale
+    check for HTTP/1.1. <code>-1</code> disables the check. Without it a connection the server closed
+    while the thread was idle is reused as it is and fails the sample, as JMeter deliberately does not
+    retry requests.<br/>
+    Defaults to: <code>2000</code>
+</property>
+<property name="httpclient5.h2.multiplexing">
+    Multiplex concurrent message exchanges (for example parallel downloads of embedded resources)
+    over a single HTTP/2 connection. The connections are not shared between threads, every JMeter
+    thread uses connections of its own. A request which exceeds its response timeout or is interrupted
+    closes the shared connection, which fails the other requests in flight over it as well. Set to
+    <code>false</code> to give each concurrent request a connection of its own.<br/>
+    Defaults to: <code>true</code>
+</property>
+<property name="httpclient5.h2.max_connections_per_route">
+    Maximum number of connections kept per target host by the client that the HttpClient5
+    implementation uses when HTTP/2 is selected. With multiplexing enabled a single connection
+    usually serves all concurrent requests. When the server negotiates HTTP/1.1 instead, or
+    multiplexing is disabled, every concurrent request needs a connection of its own, and the requests
+    beyond this limit wait for one, which counts in their elapsed time. Set it to at least the number of
+    parallel downloads of embedded resources then, as unlike with HTTP/1.1 selected, the limit is not
+    raised to that number automatically.<br/>
+    Defaults to: <code>6</code>
+</property>
+<property name="httpclient5.h2.body_spill_threshold">
+    Number of bytes of an HTTP/2 request body buffered in memory before it is spilled to a temporary
+    file.<br/>
+    Defaults to: <code>262144</code>
+</property>
+<property name="httpclient5.h2.header_table_size">
+    Size in bytes of the HPACK dynamic header table announced to the server.
+    <code>0</code> disables indexing of the headers by the server.<br/>
+    Defaults to: <code>8192</code>
+</property>
+<property name="httpclient5.h2.header_compression">
+    Compress the request headers with HPACK.<br/>
+    Defaults to: <code>true</code>
+</property>
+<property name="httpclient5.h2.max_concurrent_streams">
+    Maximum number of concurrent streams the client accepts on a single HTTP/2 connection.<br/>
+    Defaults to: <code>250</code>
+</property>
+<property name="httpclient5.h2.initial_window_size">
+    HTTP/2 flow control window in bytes announced per stream. It caps how many bytes the server may
+    send before it has to wait for a window update, so the throughput of a single response cannot
+    exceed this window divided by the round trip time. The HTTP/2 default of <code>65535</code>
+    throttles downloads over links with any noticeable latency, therefore JMeter announces a larger
+    window.<br/>
+    Defaults to: <code>16777216</code>
+</property>
+<property name="httpclient5.h2.max_frame_size">
+    Largest HTTP/2 frame payload in bytes the client is willing to receive.<br/>
+    Defaults to: <code>65536</code>
+</property>
+<property name="httpclient5.h2.push_enabled">
+    Accept HTTP/2 server push. JMeter cannot report pushed resources, so they are dropped,
+    therefore push is disabled by default.<br/>
+    Defaults to: <code>false</code>
+</property>
+<property name="httpclient5.h2.prior_knowledge">
+    Use HTTP/2 over cleartext (h2c with prior knowledge) when <code>HTTP/2</code> is selected for a
+    <code>http://</code> URL. Without it such requests fall back to HTTP/1.1, because protocol
+    negotiation requires TLS. Only enable it if all plain HTTP targets support h2c.<br/>
+    Defaults to: <code>false</code>
+</property>
+<property name="httpclient5.default_user_agent_disabled">
+    If true, the default HC5 User-Agent (Apache-HttpClient/X.Y.Z (Java/A.B.C)) will not be added.
+    A User-Agent header defined in the test plan is still sent.<br/>
+    Defaults to: <code>false</code>
 </property>
 <property name="httpclient.socket.http.cps">
     Set characters per second to a value greater then zero to emulate slow connections.<br/>
@@ -484,6 +559,9 @@ JMETER-SERVER</source>
     Should port be stripped from urls before constructing SPNs for SPNEGO authentication.
     Defaults to: <code>true</code>
 </property>
+<property name="kerberos.spnego.use_canonical_host_name">
+    Should the host name for constructing SPN be canonicalized for SPNEGO authentication.
+</property>
 <property name="kerberos.spnego.delegate_cred">
     Should SPNEGO authentication should use delegation of credentials.
     Defaults to: <code>false</code>
@@ -511,7 +589,7 @@ JMETER-SERVER</source>
 </source>
 </description>
 </section>
-<section name="&sect-num;.13 Apache HttpComponents HTTPClient configuration (HTTPClient4)" anchor="httpclient4">
+<section name="&sect-num;.13 Apache HttpComponents HttpClient configuration (HttpClient4)" anchor="httpclient4">
 <properties>
 <property name="hc.parameters.file">
     Define a properties file for overriding Apache HttpClient parameters.<br/>
@@ -797,6 +875,8 @@ JMETER-SERVER</source>
         <dt><code>HTTPSampler2</code></dt>
         <dt><code>HttpClient4</code></dt>
         <dd>Use Apache HTTPClient version 4</dd>
+        <dt><code>HttpClient5</code></dt>
+        <dd>Use Apache HTTPClient version 5</dd>
     </dl>
     Defaults to: <code>HttpClient4</code>
 </property>
@@ -1045,7 +1125,7 @@ JMETER-SERVER</source>
 </property>
 <property name="jdbc.config.jdbc.driver.class">
     List of JDBC driver class name<br/>
-    Defaults to: <source>com.mysql.jdbc.Driver|org.postgresql.Driver|oracle.jdbc.OracleDriver|com.ingres.jdbc.IngresDriver|com.microsoft.sqlserver.jdbc.SQLServerDriver|com.microsoft.jdbc.sqlserver.SQLServerDriver|org.apache.derby.jdbc.ClientDriver|org.hsqldb.jdbc.JDBCDriver|com.ibm.db2.jcc.DB2Driver|org.apache.derby.jdbc.ClientDriver|org.h2.Driver|org.firebirdsql.jdbc.FBDriver|org.mariadb.jdbc.Driver|org.sqlite.JDBC|net.sourceforge.jtds.jdbc.Driver|com.exasol.jdbc.EXADriver</source>
+    Defaults to: <source>com.mysql.cj.jdbc.Driver|com.mysql.jdbc.Driver|org.postgresql.Driver|oracle.jdbc.OracleDriver|com.ingres.jdbc.IngresDriver|com.microsoft.sqlserver.jdbc.SQLServerDriver|com.microsoft.jdbc.sqlserver.SQLServerDriver|org.apache.derby.jdbc.ClientDriver|org.hsqldb.jdbc.JDBCDriver|com.ibm.db2.jcc.DB2Driver|org.apache.derby.jdbc.ClientDriver|org.h2.Driver|org.firebirdsql.jdbc.FBDriver|org.mariadb.jdbc.Driver|org.sqlite.JDBC|net.sourceforge.jtds.jdbc.Driver|com.exasol.jdbc.EXADriver</source>
 </property>
 </properties>
 </section>
@@ -1162,7 +1242,7 @@ JMETER-SERVER</source>
     Defaults to: <code>5000</code>
 </property>
 <property name="backend_metrics_percentile_estimator">
-    Specify the <a href="https://commons.apache.org/proper/commons-math/javadocs/api-3.5/org/apache/commons/math3/stat/descriptive/rank/Percentile.EstimationType.html">Percentile Estimation Type</a> to use.<br/>
+    Specify the <a href="https://commons.apache.org/proper/commons-math/javadocs/api-3.6.1/org/apache/commons/math3/stat/descriptive/rank/Percentile.EstimationType.html">Percentile Estimation Type</a> to use.<br/>
     To make the values from the dashboard compatible with the Aggregate Report, use the value <code>R_3</code>.<br/>
     Defaults to: <code>LEGACY</code>
 </property>
@@ -1336,6 +1416,15 @@ JMETER-SERVER</source>
     ORO PatternCacheLRU size.<br/>
     Defaults to: <code>1000</code>
 </property>
+<property name="function.cache.per.iteration">
+    <p>Cache function execution during test execution.</p>
+    <p>By default, JMeter caches function properties during a test iteration, however,
+    it might cause unexpected results when a component is shared across threads and the expression depends on
+    the thread variables.</p>
+    <note>The property will likely be removed in an upcoming version, so if you need it consider raising
+     an issue with your use-case.</note>
+    Defaults to: <code>false</code>
+</property>
 <property name="propertyEditorSearchPath">
     TestBeanGui<br/>
     Defaults to: <code>null</code>
@@ -1387,7 +1476,7 @@ JMETER-SERVER</source>
 </property>
 <property name="sampleresult.default.encoding">
     The encoding to be used if none is provided.<br/>
-    Defaults to: <code>ISO-8859-1</code>
+    Defaults to: <code>UTF-8</code> (since 5.6.1)
 </property>
 <property name="CookieManager.delete_null_cookies">
     CookieManager behaviour - should cookies with null/empty values be deleted?<br/>
@@ -1422,6 +1511,17 @@ JMETER-SERVER</source>
     <note>JMeter uses Nashorn since 3.2 version.
     If you want to use Rhino, set this value to <code>true</code></note>
     Defaults to: <code>false</code>
+</property>
+<property name="jmeter.regex.engine">
+    Ability to switch out the old Oro Regex implementation with the JDK built-in implementation.
+    Any value different to <code>oro</code> will disable the Oro implementation and enable the JDK based.
+    <note>We intend to switch the default to the JDK based one in a later version of JMeter.</note>
+    Defaults to: <code>oro</code>
+</property>
+<property name="jmeter.regex.patterncache.size">
+    We assist the JDK based Regex implementation by caching Pattern objects. The size of the
+    cache can be set with this setting. It can be disabled by setting it to <code>0</code>.
+    Defaults to: <code>1000</code>
 </property>
 <property name="jmeterengine.threadstop.wait">
     Number of milliseconds to wait for a thread to stop.<br/>
@@ -1507,6 +1607,18 @@ JMETER-SERVER</source>
     Set to zero to disable the size check and display the whole response.<br/>
     Defaults to: <code>10485760</code>
 </property>
+<property name="view.results.tree.max_line_size">
+    Maximum size (in characters) of the line in the displayed.<br/>
+    This property works around Bug 63620 since Swing hangs when displaying very long lines.<br/>
+    Set to zero to disable line wrapping.<br/>
+    Defaults to: <code>110000</code>
+</property>
+<property name="view.results.tree.soft_wrap_line_size">
+    Line size (in characters) to consider wrapping to make UI faster.<br/>
+    This property works around Bug 63620 since Swing hangs when displaying very long lines.<br/>
+    Set to zero to disable line wrapping.<br/>
+    Defaults to: <code>view.results.tree.max_line_size / 1.1f</code>
+</property>
 <property name="view.results.tree.renderers_order">
     Order of Renderers in View Results Tree.<br/>
     <note>Note full class names should be used for non JMeter core renderers</note>
@@ -1515,10 +1627,20 @@ JMETER-SERVER</source>
     Defaults to:
     <source>.RenderAsText,.RenderAsRegexp,.RenderAsCssJQuery,.RenderAsXPath,.RenderAsHTML,.RenderAsHTMLWithEmbedded,.RenderAsDocument,.RenderAsJSON,.RenderAsXML</source>
 </property>
+<property name="view.results.tree.simple_view_limit">
+    Configures maximum document length for text view before switching to a simpler view, that does not do line breaks.<br/>
+    Works probably best, when combined with a low setting of <code>view.results.tree.max_line_size</code>.
+    Can be switched off by setting the value to <code>-1</code>.<br/>
+    Defaults to: <code>10000</code>
+</property>
 <property name="document.max_size">
     Maximum size (in bytes) of Document that can be parsed by Tika engine<br/>
     Set to zero to disable the size check.<br/>
     Defaults to: <code>10485760</code>
+</property>
+<property name="text.kerning.max_document_size">
+    Configures the maximum document length for rendering with kerning enabled.<br/>
+    Defaults to: <code>10000</code>
 </property>
 <property name="JMSSampler.useSecurity.properties">
     JMS options.<br/>

@@ -28,7 +28,8 @@ import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.text.MessageFormat;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -49,9 +50,6 @@ import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.tree.TreePath;
 
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.jmeter.config.Arguments;
 import org.apache.jmeter.config.KeystoreConfig;
 import org.apache.jmeter.control.Controller;
@@ -63,6 +61,7 @@ import org.apache.jmeter.gui.GuiPackage;
 import org.apache.jmeter.gui.action.AbstractAction;
 import org.apache.jmeter.gui.action.ActionNames;
 import org.apache.jmeter.gui.action.ActionRouter;
+import org.apache.jmeter.gui.action.Command;
 import org.apache.jmeter.gui.plugin.MenuCreator;
 import org.apache.jmeter.gui.tree.JMeterTreeModel;
 import org.apache.jmeter.gui.tree.JMeterTreeNode;
@@ -96,6 +95,7 @@ import org.apache.jmeter.testbeans.gui.TestBeanGUI;
 import org.apache.jmeter.testelement.TestElement;
 import org.apache.jmeter.testelement.TestPlan;
 import org.apache.jmeter.threads.AbstractThreadGroup;
+import org.apache.jmeter.threads.AbstractThreadGroupSchema;
 import org.apache.jmeter.threads.ThreadGroup;
 import org.apache.jmeter.threads.gui.ThreadGroupGui;
 import org.apache.jmeter.util.JMeterUtils;
@@ -103,12 +103,12 @@ import org.apache.jmeter.visualizers.ViewResultsFullVisualizer;
 import org.apache.jorphan.collections.HashTree;
 import org.apache.jorphan.gui.ComponentUtil;
 import org.apache.jorphan.gui.JMeterUIDefaults;
+import org.apache.jorphan.util.StringUtilities;
 import org.apache.tika.Tika;
-import org.apache.tika.config.TikaConfig;
-import org.apache.tika.exception.TikaException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.xml.sax.SAXException;
+
+import com.google.auto.service.AutoService;
 
 /**
  * Opens a popup where user can enter a cURL command line and create a test plan
@@ -116,6 +116,10 @@ import org.xml.sax.SAXException;
  *
  * @since 5.1
  */
+@AutoService({
+        Command.class,
+        MenuCreator.class
+})
 public class ParseCurlCommandAction extends AbstractAction implements MenuCreator, ActionListener { // NOSONAR
     private static final Logger LOGGER = LoggerFactory.getLogger(ParseCurlCommandAction.class);
     private static final String ACCEPT_ENCODING = "Accept-Encoding";
@@ -123,7 +127,6 @@ public class ParseCurlCommandAction extends AbstractAction implements MenuCreato
     public static final String IMPORT_CURL = "import_curl";
     private static final String CREATE_REQUEST = "CREATE_REQUEST";
     private static final String CERT = "cert";
-    private Logger log = LoggerFactory.getLogger(getClass());
     /** A panel allowing results to be saved. */
     private FilePanel filePanel = null;
     static {
@@ -132,16 +135,7 @@ public class ParseCurlCommandAction extends AbstractAction implements MenuCreato
     private JSyntaxTextArea cURLCommandTA;
     private JLabel statusText;
     private JCheckBox uploadCookiesCheckBox;
-    private final Tika tika = createTika();
-
-    private Tika createTika() {
-        try {
-            return new Tika(new TikaConfig(this.getClass().getClassLoader()
-                    .getResourceAsStream("org/apache/jmeter/protocol/http/gui/action/tika-config.xml")));
-        } catch (TikaException | IOException | SAXException e) {
-            return new Tika();
-        }
-    }
+    private final Tika tika = new Tika();
 
     public ParseCurlCommandAction() {
         super();
@@ -193,12 +187,12 @@ public class ParseCurlCommandAction extends AbstractAction implements MenuCreato
      * @return the first node of the given type in the test component tree, or
      *         <code>null</code> if none was found.
      */
-    private JMeterTreeNode findFirstNodeOfType(Class<?> type) {
+    private static JMeterTreeNode findFirstNodeOfType(Class<?> type) {
         JMeterTreeModel treeModel = GuiPackage.getInstance().getTreeModel();
         return treeModel.getNodesOfType(type).stream().filter(JMeterTreeNode::isEnabled).findFirst().orElse(null);
     }
 
-    private DNSCacheManager findNodeOfTypeDnsCacheManagerByType(boolean isCustom) {
+    private static DNSCacheManager findNodeOfTypeDnsCacheManagerByType(boolean isCustom) {
         JMeterTreeModel treeModel = GuiPackage.getInstance().getTreeModel();
         List<JMeterTreeNode> res = treeModel.getNodesOfType(DNSCacheManager.class);
         for (JMeterTreeNode jm : res) {
@@ -219,13 +213,13 @@ public class ParseCurlCommandAction extends AbstractAction implements MenuCreato
         ThreadGroup threadGroup = new ThreadGroup();
         threadGroup.setProperty(TestElement.GUI_CLASS, ThreadGroupGui.class.getName());
         threadGroup.setProperty(TestElement.NAME, "Thread Group");
-        threadGroup.setProperty(AbstractThreadGroup.NUM_THREADS, "${__P(threads,10)}");
+        threadGroup.set(AbstractThreadGroupSchema.INSTANCE.getNumThreads(), "${__P(threads,10)}");
         threadGroup.setProperty(ThreadGroup.RAMP_TIME,"${__P(rampup,30)}");
         threadGroup.setScheduler(true);
         threadGroup.setProperty(ThreadGroup.DURATION,"${__P(duration,3600)}");
         threadGroup.setDelay(5);
         LoopController loopCtrl = new LoopController();
-        loopCtrl.setProperty(LoopController.LOOPS,"${__P(iterations,-1)}");
+        loopCtrl.setLoops("${__P(iterations,-1)}");
         loopCtrl.setContinueForever(false);
         threadGroup.setSamplerController(loopCtrl);
         TestPlan testPlan = new TestPlan();
@@ -305,14 +299,16 @@ public class ParseCurlCommandAction extends AbstractAction implements MenuCreato
             httpSampler.setPort(url.getPort());
         }
         String path = url.getPath();
-        if (StringUtils.isNotEmpty(url.getQuery())) {
-            path += "?" + url.getQuery();
+        String query = url.getQuery();
+        if (StringUtilities.isNotEmpty(query)) {
+            path += "?" + query;
         }
+        // setMethod must be before setPath as setPath uses method to determine if parameters should be parsed or not
+        httpSampler.setMethod(request.getMethod());
         httpSampler.setPath(path);
         httpSampler.setDomain(url.getHost());
         httpSampler.setUseKeepAlive(request.isKeepAlive());
         httpSampler.setFollowRedirects(true);
-        httpSampler.setMethod(request.getMethod());
         HeaderManager headerManager = createHeaderManager(request);
         httpSampler.addTestElement(headerManager);
         configureTimeout(request, httpSampler);
@@ -337,7 +333,7 @@ public class ParseCurlCommandAction extends AbstractAction implements MenuCreato
         return httpSampler;
     }
 
-    private void configureTimeout(Request request, HTTPSamplerProxy httpSampler) {
+    private static void configureTimeout(Request request, HTTPSamplerProxy httpSampler) {
         double connectTimeout = request.getConnectTimeout();
         double maxTime = request.getMaxTime();
         if (connectTimeout >= 0) {
@@ -356,13 +352,13 @@ public class ParseCurlCommandAction extends AbstractAction implements MenuCreato
      * @param request {@link Request}
      * @return {@link HeaderManager} element
      */
-    private HeaderManager createHeaderManager(Request request) {
+    private static HeaderManager createHeaderManager(Request request) {
         HeaderManager headerManager = new HeaderManager();
         headerManager.setProperty(TestElement.GUI_CLASS, HeaderPanel.class.getName());
         headerManager.setProperty(TestElement.NAME, "HTTP HeaderManager");
         headerManager.setProperty(TestElement.COMMENTS, getDefaultComment());
         boolean hasAcceptEncoding = false;
-        for (Pair<String, String> header : request.getHeaders()) {
+        for (Map.Entry<String, String> header : request.getHeaders()) {
             String key = header.getKey();
             hasAcceptEncoding = hasAcceptEncoding || key.equalsIgnoreCase(ACCEPT_ENCODING);
             headerManager.getHeaders().addItem(new Header(key, header.getValue()));
@@ -410,7 +406,7 @@ public class ParseCurlCommandAction extends AbstractAction implements MenuCreato
         }
     }
 
-    private KeystoreConfig createKeystoreConfiguration() {
+    private static KeystoreConfig createKeystoreConfiguration() {
         KeystoreConfig keystoreConfig = new KeystoreConfig();
         keystoreConfig.setProperty(TestElement.GUI_CLASS, TestBeanGUI.class.getName());
         keystoreConfig.setProperty(TestElement.NAME, "Keystore Configuration");
@@ -423,7 +419,7 @@ public class ParseCurlCommandAction extends AbstractAction implements MenuCreato
      *
      * @param request {@link Request}
      */
-    private void createAuthManager(Request request, AuthManager authManager) {
+    private static void createAuthManager(Request request, AuthManager authManager) {
         Authorization auth = request.getAuthorization();
         authManager.setProperty(TestElement.GUI_CLASS, AuthPanel.class.getName());
         authManager.setProperty(TestElement.NAME, "HTTP AuthorizationManager");
@@ -438,7 +434,7 @@ public class ParseCurlCommandAction extends AbstractAction implements MenuCreato
      * @param authManager {@link AuthManager} element
      * @return whether to update Authorization Manager in http request
      */
-    private boolean canAddAuthManagerInHttpRequest(Request request, AuthManager authManager) {
+    private static boolean canAddAuthManagerInHttpRequest(Request request, AuthManager authManager) {
         Authorization auth = request.getAuthorization();
         for (int i = 0; i < authManager.getAuthObjects().size(); i++) {
             if (!authManager.getAuthObjectAt(i).getUser().equals(auth.getUser())
@@ -457,7 +453,7 @@ public class ParseCurlCommandAction extends AbstractAction implements MenuCreato
      * @param authManager {@link AuthManager} element
      * @return whether to update Authorization Manager in Thread Group
      */
-    private boolean canUpdateAuthManagerInThreadGroup(Request request, AuthManager authManager) {
+    private static boolean canUpdateAuthManagerInThreadGroup(Request request, AuthManager authManager) {
         Authorization auth = request.getAuthorization();
         for (int i = 0; i < authManager.getAuthObjects().size(); i++) {
             if (auth.getURL().equals(authManager.getAuthObjectAt(i).getURL())) {
@@ -467,7 +463,7 @@ public class ParseCurlCommandAction extends AbstractAction implements MenuCreato
         return true;
     }
 
-    private void createDnsServer(Request request, DNSCacheManager dnsCacheManager) {
+    private static void createDnsServer(Request request, DNSCacheManager dnsCacheManager) {
         Set<String> dnsServers = request.getDnsServers();
         dnsCacheManager.setProperty(TestElement.GUI_CLASS, DNSCachePanel.class.getName());
         dnsCacheManager.setProperty(TestElement.NAME, "DNS Cache Manager");
@@ -478,7 +474,7 @@ public class ParseCurlCommandAction extends AbstractAction implements MenuCreato
         }
     }
 
-    private boolean canAddDnsServerInHttpRequest(Request request, DNSCacheManager dnsCacheManager) {
+    private static boolean canAddDnsServerInHttpRequest(Request request, DNSCacheManager dnsCacheManager) {
         Set<String> currentDnsServers =new HashSet<>();
         Set<String> newDnsServers = request.getDnsServers();
         for (int i = 0; i < dnsCacheManager.getServers().size(); i++) {
@@ -487,7 +483,7 @@ public class ParseCurlCommandAction extends AbstractAction implements MenuCreato
         return !(newDnsServers.size() == currentDnsServers.size() && newDnsServers.containsAll(currentDnsServers));
     }
 
-    private void createDnsResolver(Request request, DNSCacheManager dnsCacheManager) {
+    private static void createDnsResolver(Request request, DNSCacheManager dnsCacheManager) {
         dnsCacheManager.setProperty(TestElement.GUI_CLASS, DNSCachePanel.class.getName());
         dnsCacheManager.setProperty(TestElement.NAME, "DNS Cache Manager");
         dnsCacheManager.setCustomResolver(true);
@@ -511,7 +507,7 @@ public class ParseCurlCommandAction extends AbstractAction implements MenuCreato
         return "Created from cURL on " + LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME);
     }
 
-    private boolean canAddDnsResolverInHttpRequest(Request request, DNSCacheManager dnsCacheManager) {
+    private static boolean canAddDnsResolverInHttpRequest(Request request, DNSCacheManager dnsCacheManager) {
         if (dnsCacheManager.getHosts().size() != 1) {
             return true;
         } else {
@@ -531,12 +527,12 @@ public class ParseCurlCommandAction extends AbstractAction implements MenuCreato
             throw new IllegalArgumentException("--form and --data can't appear in the same command");
         }
         List<HTTPFileArg> httpFileArgs = new ArrayList<>();
-        for (Pair<String, String> entry : request.getFormStringData()) {
+        for (Map.Entry<String, String> entry : request.getFormStringData()) {
             String formName = entry.getKey();
             String formValue = entry.getValue();
             httpSampler.addNonEncodedArgument(formName, formValue, "");
         }
-        for (Pair<String, ArgumentHolder> entry : request.getFormData()) {
+        for (Map.Entry<String, ArgumentHolder> entry : request.getFormData()) {
             String formName = entry.getKey();
             ArgumentHolder formValueObject = entry.getValue();
             String formValue = formValueObject.getName();
@@ -550,11 +546,11 @@ public class ParseCurlCommandAction extends AbstractAction implements MenuCreato
                         if (contentFile.canRead()) {
                             contentType = tika.detect(contentFile);
                         } else {
-                            log.info("Can not read file {}, so guessing contentType by extension.", formValue);
+                            LOGGER.info("Can not read file {}, so guessing contentType by extension.", formValue);
                             contentType = tika.detect(formValue);
                         }
                     } catch (IOException e) {
-                        log.info(
+                        LOGGER.info(
                                 "Could not detect contentType for file {} by content, so falling back to detection by filename",
                                 formValue);
                         contentType = tika.detect(formValue);
@@ -574,28 +570,18 @@ public class ParseCurlCommandAction extends AbstractAction implements MenuCreato
         }
     }
 
-    private void createProxyServer(Request request, HTTPSamplerProxy httpSampler) {
+    private static void createProxyServer(Request request, HTTPSamplerProxy httpSampler) {
         Map<String, String> proxyServer = request.getProxyServer();
         for (Map.Entry<String, String> proxyPara : proxyServer.entrySet()) {
             String key = proxyPara.getKey();
             switch (key) {
-            case "servername":
-                httpSampler.setProxyHost(proxyPara.getValue());
-                break;
-            case "port":
-                httpSampler.setProxyPortInt(proxyPara.getValue());
-                break;
-            case "scheme":
-                httpSampler.setProxyScheme(proxyPara.getValue());
-                break;
-            case "username":
-                httpSampler.setProxyUser(proxyPara.getValue());
-                break;
-            case "password":
-                httpSampler.setProxyPass(proxyPara.getValue());
-                break;
-            default:
-                break;
+                case "servername" -> httpSampler.setProxyHost(proxyPara.getValue());
+                case "port" -> httpSampler.setProxyPortInt(proxyPara.getValue());
+                case "scheme" -> httpSampler.setProxyScheme(proxyPara.getValue());
+                case "username" -> httpSampler.setProxyUser(proxyPara.getValue());
+                case "password" -> httpSampler.setProxyPass(proxyPara.getValue());
+                default -> {
+                }
             }
         }
     }
@@ -622,10 +608,10 @@ public class ParseCurlCommandAction extends AbstractAction implements MenuCreato
         if (e.getActionCommand().equals(CREATE_REQUEST)) {
             List<String> commandsList = null;
             try {
-                if (!filePanel.getFilename().trim().isEmpty() && cURLCommandTA.getText().trim().isEmpty()) {
+                if (StringUtilities.isNotBlank(filePanel.getFilename()) && StringUtilities.isBlank(cURLCommandTA.getText())) {
                     commandsList = readFromFile(filePanel.getFilename().trim());
                     isReadFromFile = true;
-                } else if (filePanel.getFilename().trim().isEmpty() && !cURLCommandTA.getText().trim().isEmpty()) {
+                } else if (StringUtilities.isBlank(filePanel.getFilename()) && StringUtilities.isNotBlank(cURLCommandTA.getText())) {
                     commandsList = readFromTextPanel(cURLCommandTA.getText().trim());
                 } else {
                     throw new IllegalArgumentException(
@@ -807,9 +793,7 @@ public class ParseCurlCommandAction extends AbstractAction implements MenuCreato
     }
 
     public List<String> readFromFile(String pathname) throws IOException {
-        String encoding = StandardCharsets.UTF_8.name();
-        File file = new File(pathname);
-        return FileUtils.readLines(file, encoding);
+        return Files.readAllLines(Path.of(pathname));
     }
 
     public List<String> readFromTextPanel(String commands) {

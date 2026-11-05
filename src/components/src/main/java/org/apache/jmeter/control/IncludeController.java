@@ -27,8 +27,10 @@ import org.apache.jmeter.save.SaveService;
 import org.apache.jmeter.services.FileServer;
 import org.apache.jmeter.testelement.TestElement;
 import org.apache.jmeter.testelement.TestPlan;
+import org.apache.jmeter.testelement.schema.PropertiesAccessor;
 import org.apache.jmeter.util.JMeterUtils;
 import org.apache.jorphan.collections.HashTree;
+import org.apache.jorphan.util.StringUtilities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,8 +38,6 @@ public class IncludeController extends GenericController implements ReplaceableC
     private static final Logger log = LoggerFactory.getLogger(IncludeController.class);
 
     private static final long serialVersionUID = 241L;
-
-    private static final String INCLUDE_PATH = "IncludeController.includepath"; //$NON-NLS-1$
 
     private static  final String PREFIX =
         JMeterUtils.getPropDefault(
@@ -54,6 +54,16 @@ public class IncludeController extends GenericController implements ReplaceableC
      */
     public IncludeController() {
         super();
+    }
+
+    @Override
+    public IncludeControllerSchema getSchema() {
+        return IncludeControllerSchema.INSTANCE;
+    }
+
+    @Override
+    public PropertiesAccessor<? extends IncludeController, ? extends IncludeControllerSchema> getProps() {
+        return new PropertiesAccessor<>(this, getSchema());
     }
 
     @Override
@@ -81,7 +91,7 @@ public class IncludeController extends GenericController implements ReplaceableC
      * @param jmxfile The path to the JMX test plan to include
      */
     public void setIncludePath(String jmxfile) {
-        this.setProperty(INCLUDE_PATH,jmxfile);
+        set(getSchema().getIncludePath(), jmxfile);
     }
 
     /**
@@ -89,7 +99,7 @@ public class IncludeController extends GenericController implements ReplaceableC
      * @return the JMX file path
      */
     public String getIncludePath() {
-        return this.getPropertyAsString(INCLUDE_PATH);
+        return get(getSchema().getIncludePath());
     }
 
     /**
@@ -119,7 +129,7 @@ public class IncludeController extends GenericController implements ReplaceableC
         // only try to load the JMX test plan if there is one
         final String includePath = getIncludePath();
         HashTree tree = null;
-        if (includePath != null && includePath.length() > 0) {
+        if (StringUtilities.isNotEmpty(includePath)) {
             String fileName=PREFIX+includePath;
             try {
                 File file = new File(fileName.trim());
@@ -172,7 +182,7 @@ public class IncludeController extends GenericController implements ReplaceableC
      * @param tree HashTree included Test Plan
      * @return HashTree Subset within Test Fragment or Empty HashTree
      */
-    private HashTree getProperBranch(HashTree tree) {
+    private static HashTree getProperBranch(HashTree tree) {
         for (Object o : new ArrayList<>(tree.list())) {
             TestElement item = (TestElement) o;
 
@@ -192,7 +202,7 @@ public class IncludeController extends GenericController implements ReplaceableC
     }
 
 
-    private void removeDisabledItems(HashTree tree) {
+    private static void removeDisabledItems(HashTree tree) {
         for (Object o : new ArrayList<>(tree.list())) {
             TestElement item = (TestElement) o;
             if (!item.isEnabled()) {

@@ -17,9 +17,9 @@
 
 package org.apache.jmeter.protocol.http.util;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.jmeter.testelement.property.PropertyIterator;
@@ -56,7 +56,7 @@ public class TestHTTPFileArgs {
 
     @Test
     public void testSetHTTPFileArgs() throws Exception {
-        List<HTTPFileArg> newHTTPFileArgs = new LinkedList<>();
+        List<HTTPFileArg> newHTTPFileArgs = new ArrayList<>();
         newHTTPFileArgs.add(new HTTPFileArg("hede"));
         HTTPFileArgs files = new HTTPFileArgs();
         files.setHTTPFileArgs(newHTTPFileArgs);
@@ -116,9 +116,9 @@ public class TestHTTPFileArgs {
         files.addHTTPFileArg("file1");
         files.addHTTPFileArg("file2.jpg");
         files.addHTTPFileArg("file3.jar");
-        assertEquals("path:'file1'|param:''|mimetype:'application/octet-stream'\n"
-                    +"path:'file2.jpg'|param:''|mimetype:'image/jpeg'\n"
-                    +"path:'file3.jar'|param:''|mimetype:'application/java-archive'",
-                    files.toString());
+        assertEquals("""
+                path:'file1'|param:''|mimetype:'application/octet-stream'
+                path:'file2.jpg'|param:''|mimetype:'image/jpeg'
+                path:'file3.jar'|param:''|mimetype:'application/java-archive'""", files.toString());
     }
 }

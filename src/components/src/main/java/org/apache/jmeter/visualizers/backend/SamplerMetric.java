@@ -42,27 +42,27 @@ public class SamplerMetric {
     /**
      * Response times for OK samples
      */
-    private DescriptiveStatistics okResponsesStats = DescriptiveStatisticsFactory.createDescriptiveStatistics(LARGE_SLIDING_WINDOW_SIZE);
+    private final DescriptiveStatistics okResponsesStats = DescriptiveStatisticsFactory.createDescriptiveStatistics(LARGE_SLIDING_WINDOW_SIZE);
     /**
      * Response times for KO samples
      */
-    private DescriptiveStatistics koResponsesStats = DescriptiveStatisticsFactory.createDescriptiveStatistics(LARGE_SLIDING_WINDOW_SIZE);
+    private final DescriptiveStatistics koResponsesStats = DescriptiveStatisticsFactory.createDescriptiveStatistics(LARGE_SLIDING_WINDOW_SIZE);
     /**
      * Response times for All samples
      */
-    private DescriptiveStatistics allResponsesStats = DescriptiveStatisticsFactory.createDescriptiveStatistics(LARGE_SLIDING_WINDOW_SIZE);
+    private final DescriptiveStatistics allResponsesStats = DescriptiveStatisticsFactory.createDescriptiveStatistics(LARGE_SLIDING_WINDOW_SIZE);
     /**
      *  OK, KO, ALL stats
      */
-    private List<DescriptiveStatistics> windowedStats = initWindowedStats();
+    private final List<DescriptiveStatistics> windowedStats = initWindowedStats();
     /**
      * Timeboxed percentiles don't makes sense
      */
-    private DescriptiveStatistics pctResponseStats = DescriptiveStatisticsFactory.createDescriptiveStatistics(SLIDING_WINDOW_SIZE);
+    private final DescriptiveStatistics pctResponseStats = DescriptiveStatisticsFactory.createDescriptiveStatistics(SLIDING_WINDOW_SIZE);
     private int successes;
     private int failures;
     private int hits;
-    private Map<ErrorMetric, Integer> errors = new HashMap<>();
+    private final Map<ErrorMetric, Integer> errors = new HashMap<>();
     private long sentBytes;
     private long receivedBytes;
 
@@ -127,14 +127,14 @@ public class SamplerMetric {
             errors.put(error, errors.getOrDefault(error, 0) + result.getErrorCount() );
         }
         long time = result.getTime();
-        allResponsesStats.addValue(time);
-        pctResponseStats.addValue(time);
+        allResponsesStats.addValue((double) time);
+        pctResponseStats.addValue((double) time);
         if(result.isSuccessful()) {
             // Should we also compute KO , all response time ?
             // only take successful requests for time computing
-            okResponsesStats.addValue(time);
+            okResponsesStats.addValue((double) time);
         }else {
-            koResponsesStats.addValue(time);
+            koResponsesStats.addValue((double) time);
         }
         addHits(result, isCumulated);
         addNetworkData(result, isCumulated);
@@ -178,17 +178,15 @@ public class SamplerMetric {
      */
     public synchronized void resetForTimeInterval() {
         switch (globalWindowMode) {
-        case FIXED:
-            // We don't clear responsesStats nor usersStats as it will slide as per my understanding of
-            // http://commons.apache.org/proper/commons-math/userguide/stat.html
-            break;
-        case TIMED:
-            for (DescriptiveStatistics stat : windowedStats) {
-                stat.clear();
+            case FIXED -> {
+                // We don't clear responsesStats nor usersStats as it will slide as per my understanding of
+                // http://commons.apache.org/proper/commons-math/userguide/stat.html
             }
-            break;
-        default:
-            // This cannot happen
+            case TIMED -> {
+                for (DescriptiveStatistics stat : windowedStats) {
+                    stat.clear();
+                }
+            }
         }
         errors.clear();
         successes = 0;

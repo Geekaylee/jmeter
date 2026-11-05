@@ -102,6 +102,7 @@ The other specific Test Plan sections are:
 <li><a href="build-ldap-test-plan.html">LDAP</a></li>
 <li><a href="build-ldapext-test-plan.html">LDAP Extended</a></li>
 <li><a href="build-ws-test-plan.html">WebServices (SOAP)</a></li>
+<li><a href="build-programmatic-test-plan.html">Building Test Plan programmatically</a></li>
 </ul>
 </p>
 <p>Once you are comfortable with building and running JMeter Test Plans, you can look into the
@@ -114,7 +115,7 @@ over your Test Plans.</p>
 <p>JMeter requires that your computing environment meets some minimum requirements.</p>
 
 <subsection name="&sect-num;.1.1 Java Version" anchor="java_versions">
-<note>JMeter is compatible with Java 8 or higher.
+<note>JMeter is compatible with Java 17 or higher.
 We highly advise you to install latest minor version of your major version for security and performance reasons.
 </note>
 <p>Because JMeter uses only standard Java APIs, please do not file bug reports if your JRE fails to run
@@ -224,7 +225,7 @@ apache-jmeter-X.Y/lib/
 apache-jmeter-X.Y/lib/ext
 apache-jmeter-X.Y/lib/junit
 apache-jmeter-X.Y/licenses
-apache-jmeter-X.Y/printable_docs
+apache-jmeter-X.Y/docs
 </source>
 You can rename the parent directory (i.e. <code>apache-jmeter-X.Y</code>) if you want, but do not change any of the sub-directory names.
 </p>
@@ -516,6 +517,7 @@ To do so, use the following options:</p>
 <dl>
 <dt><code>-D[prop_name]=[value]</code></dt><dd>defines a java system property value.</dd>
 <dt><code>-J[prop_name]=[value]</code></dt><dd>defines a local JMeter property.</dd>
+<dt><code>-q[propertyfile]</code></dt><dd>additional JMeter property file</dd>
 <dt><code>-G[prop_name]=[value]</code></dt><dd>defines a JMeter property to be sent to all remote servers.</dd>
 <dt><code>-G[propertyfile]</code></dt><dd>defines a file containing JMeter properties to be sent to all remote servers.</dd>
 <dt><code>-L[category]=[priority]</code></dt><dd>overrides a logging setting, setting a particular category to the given priority level.</dd>
@@ -826,8 +828,8 @@ This daemon thread waits a short while; if it returns from the wait, then clearl
 JVM has not been able to exit, and the thread prints a message to say why.
 </p>
 <p>
-The property <code>jmeter.exit.check.pause</code> can be used to override the default pause of 2000ms (2secs).
-If set to <code>0</code>, then JMeter does not start the daemon thread.
+The property <code>jmeter.exit.check.pause</code> can be used to configure the delay before printing non-daemon threads.
+If set to <code>0</code> (default value), then JMeter does not print non-terminated threads at the end of the test.
 </p>
 </subsection>
 
@@ -850,8 +852,7 @@ If set to <code>0</code>, then JMeter does not start the daemon thread.
     <property name="ssl.provider">You can specify the class for your SSL
     implementation if you don't want to use the built-in Java implementation.
     </property>
-    <property name="xml.parser">You can specify an implementation as your XML
-    parser. The default value is: <code>org.apache.xerces.parsers.SAXParser</code></property>
+    <property name="xml.parser">You can specify an implementation as your XML parser.</property>
   <property name="remote_hosts">Comma-delimited list of remote JMeter hosts (or <code>host:port</code> if required).
     If you are running JMeter in a distributed environment, list the machines where
   you have JMeter remote servers running.  This will allow you to control those

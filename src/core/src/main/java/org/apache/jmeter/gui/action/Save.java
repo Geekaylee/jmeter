@@ -21,24 +21,26 @@ import java.awt.event.ActionEvent;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.FileTime;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
 import javax.swing.tree.DefaultMutableTreeNode;
 
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.FilenameUtils;
-import org.apache.commons.io.comparator.LastModifiedFileComparator;
-import org.apache.commons.io.filefilter.IOFileFilter;
 import org.apache.jmeter.control.gui.TestFragmentControllerGui;
 import org.apache.jmeter.engine.TreeCloner;
 import org.apache.jmeter.exceptions.IllegalUserActionException;
@@ -49,12 +51,17 @@ import org.apache.jmeter.save.SaveService;
 import org.apache.jmeter.services.FileServer;
 import org.apache.jmeter.testelement.TestElement;
 import org.apache.jmeter.testelement.TestPlan;
-import org.apache.jmeter.threads.ThreadGroup;
+import org.apache.jmeter.threads.AbstractThreadGroup;
 import org.apache.jmeter.util.JMeterUtils;
 import org.apache.jorphan.collections.HashTree;
 import org.apache.jorphan.collections.ListedHashTree;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.auto.service.AutoService;
+
+import kotlin.io.FilesKt;
+import kotlin.io.path.PathsKt;
 
 /**
  * Save the current test plan; implements:
@@ -62,10 +69,9 @@ import org.slf4j.LoggerFactory;
  * Save TestPlan As
  * Save (Selection) As
  */
+@AutoService(Command.class)
 public class Save extends AbstractAction {
     private static final Logger log = LoggerFactory.getLogger(Save.class);
-
-    private static final List<File> EMPTY_FILE_LIST = Collections.emptyList();
 
     private static final String JMX_BACKUP_ON_SAVE = "jmeter.gui.action.save.backup_on_save"; // $NON-NLS-1$
 
@@ -180,7 +186,7 @@ public class Save extends AbstractAction {
      * @param nodes Array of {@link JMeterTreeNode}
      * @return {@link HashTree} new test plan
      */
-    private HashTree createTestFragmentNode(JMeterTreeNode[] nodes) {
+    private static HashTree createTestFragmentNode(JMeterTreeNode[] nodes) {
         TestElement element = GuiPackage.getInstance().createTestElement(TestFragmentControllerGui.class.getName());
         HashTree hashTree = new ListedHashTree();
         HashTree tfTree = hashTree.add(new JMeterTreeNode(element, null));
@@ -197,16 +203,17 @@ public class Save extends AbstractAction {
     /**
      * @return String new file name or null if user want to cancel
      */
-    private String computeFileName() {
+    private static String computeFileName() {
         JFileChooser chooser = FileDialoger.promptToSaveFile(GuiPackage.getInstance().getTreeListener()
                 .getCurrentNode().getName()
                 + JMX_FILE_EXTENSION);
         if (chooser == null) {
             return null;
         }
-        String updateFile = chooser.getSelectedFile().getAbsolutePath();
+        File selectedFile = chooser.getSelectedFile();
+        String updateFile = selectedFile.getAbsolutePath();
         // Make sure the file ends with proper extension
-        if(FilenameUtils.getExtension(updateFile).isEmpty()) {
+        if (FilesKt.getExtension(selectedFile).isEmpty()) {
             updateFile = updateFile + JMX_FILE_EXTENSION;
         }
         // Check if the user is trying to save to an existing file
@@ -236,9 +243,9 @@ public class Save extends AbstractAction {
     void backupAndSave(ActionEvent e, HashTree subTree, boolean fullSave, String newFile)
             throws IllegalUserActionException {
         //
-        List<File> expiredBackupFiles = EMPTY_FILE_LIST;
+        List<Path> expiredBackupFiles = Collections.emptyList();
         if (GuiPackage.getInstance().isDirty()) {
-            File fileToBackup = new File(newFile);
+            Path fileToBackup = Path.of(newFile);
             log.debug("Test plan has changed, make backup of {}", fileToBackup);
             try {
                 expiredBackupFiles = createBackupFile(fileToBackup);
@@ -265,7 +272,28 @@ public class Save extends AbstractAction {
 
             // delete expired backups : here everything went right so we can
             // proceed to deletion
-            expiredBackupFiles.forEach(FileUtils::deleteQuietly);
+            for (Path backupFile : expiredBackupFiles) {
+                try {
+                    PathsKt.deleteRecursively(backupFile);
+                    //noinspection ConstantValue
+                    if (false) {
+                        throw new IOException("Make javac happy as deleteRecursively can throw IOException");
+                    }
+                } catch (IOException ioe) {
+                    if (log.isDebugEnabled()) {
+                        log.info(
+                                "Failed to delete backup file: {}. It is not an error as the backup is not needed after a successful save",
+                                backupFile.toAbsolutePath().toString(),
+                                ioe
+                        );
+                    } else {
+                        log.info(
+                                "Failed to delete backup file: {}. It is not an error as the backup is not needed after a successful save",
+                                backupFile.toAbsolutePath().toString()
+                        );
+                    }
+                }
+            }
         } catch (RuntimeException ex) {
             throw ex;
         } catch (Exception ex) {
@@ -334,12 +362,12 @@ public class Save extends AbstractAction {
      *         properties and that should be deleted after the save operation
      *         has performed successfully
      */
-    private List<File> createBackupFile(File fileToBackup) {
-        if (!BACKUP_ENABLED || !fileToBackup.exists()) {
-            return EMPTY_FILE_LIST;
+    private static List<Path> createBackupFile(Path fileToBackup) {
+        if (!BACKUP_ENABLED || !Files.exists(fileToBackup)) {
+            return Collections.emptyList();
         }
         char versionSeparator = '-'; //$NON-NLS-1$
-        String baseName = fileToBackup.getName();
+        String baseName = fileToBackup.getFileName().toString();
         // remove .jmx extension if any
         baseName = baseName.endsWith(JMX_FILE_EXTENSION)
                 ? baseName.substring(0, baseName.length() - JMX_FILE_EXTENSION.length())
@@ -351,7 +379,7 @@ public class Save extends AbstractAction {
             log.error(
                     "Could not backup file! Backup directory does not exist, is not a directory or could not be created ! <{}>", //$NON-NLS-1$
                     backupDir.getAbsolutePath());
-            return EMPTY_FILE_LIST;
+            return Collections.emptyList();
         }
 
         // select files matching:
@@ -362,10 +390,23 @@ public class Save extends AbstractAction {
                 + Pattern.quote(JMX_FILE_EXTENSION);
         Pattern backupPattern = Pattern.compile(backupPatternRegex);
         // get all backup files in the backup directory
-        List<File> backupFiles = new ArrayList<>(FileUtils.listFiles(
-                backupDir, new PrivatePatternFileFilter(backupPattern), null));
-        // oldest to newest
-        backupFiles.sort(LastModifiedFileComparator.LASTMODIFIED_COMPARATOR);
+        List<Path> backupFiles;
+        try (Stream<Path> paths = Files.list(backupDir.toPath())) {
+            backupFiles = paths
+                    .filter(Files::isRegularFile)
+                    .filter(path -> backupPattern.matcher(path.getFileName().toString()).matches())
+                    .sorted(Comparator.comparing(p -> {
+                        try {
+                            return Files.getLastModifiedTime(p);
+                        } catch (IOException e) {
+                            return FileTime.fromMillis(0);
+                        }
+                    }))
+                    .collect(Collectors.toList());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
         // this should be the most recent backup
         int lastVersionNumber = getHighestVersionNumber(backupPattern, backupFiles);
 
@@ -378,13 +419,13 @@ public class Save extends AbstractAction {
         File backupFile = new File(backupDir, backupName);
         // create file backup
         try {
-            FileUtils.copyFile(fileToBackup, backupFile);
+            Files.copy(fileToBackup, backupFile.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
         } catch (IOException e) {
-            log.error("Failed to backup file: {}", fileToBackup.getAbsolutePath(), e); //$NON-NLS-1$
-            return EMPTY_FILE_LIST;
+            log.error("Failed to backup file: {}", fileToBackup.toAbsolutePath().toString(), e); //$NON-NLS-1$
+            return Collections.emptyList();
         }
         // add the new backup file (list is still sorted here)
-        backupFiles.add(backupFile);
+        backupFiles.add(backupFile.toPath());
 
         return backupFilesToDelete(backupFiles);
     }
@@ -397,10 +438,13 @@ public class Save extends AbstractAction {
      * @param backupFiles
      *            {@link List} of {@link File}
      */
-    private int getHighestVersionNumber(Pattern backupPattern, List<File> backupFiles) {
-        return backupFiles.stream().map(backupFile -> backupPattern.matcher(backupFile.getName()))
+    private static int getHighestVersionNumber(Pattern backupPattern, List<? extends Path> backupFiles) {
+        return backupFiles.stream()
+                .map(backupFile -> backupPattern.matcher(backupFile.getFileName().toString()))
                 .filter(matcher -> matcher.find() && matcher.groupCount() > 0)
-                .mapToInt(matcher -> Integer.parseInt(matcher.group(1))).max().orElse(0);
+                .mapToInt(matcher -> Integer.parseInt(matcher.group(1)))
+                .max()
+                .orElse(0);
     }
 
     /**
@@ -409,10 +453,10 @@ public class Save extends AbstractAction {
      * @param backupFiles
      *            list of all backup files
      * @return list of files to be deleted based upon properties described
-     *         {@link #createBackupFile(File)}
+     *         {@link #createBackupFile(Path)}
      */
-    private List<File> backupFilesToDelete(List<File> backupFiles) {
-        List<File> filesToDelete = new ArrayList<>();
+    private static List<Path> backupFilesToDelete(List<? extends Path> backupFiles) {
+        List<Path> filesToDelete = new ArrayList<>();
         if (BACKUP_MAX_HOURS > 0) {
             filesToDelete.addAll(expiredBackupFiles(backupFiles));
         }
@@ -428,15 +472,25 @@ public class Save extends AbstractAction {
 
 
     /**
-     * @param backupFiles {@link List} of {@link File} to filter
-     * @return {@link List} of {@link File} that are expired
+     * @param backupFiles {@link List} of {@link Path} to filter
+     * @return {@link Path} of {@link File} that are expired
      */
-    private List<File> expiredBackupFiles(List<File> backupFiles) {
+    private static List<Path> expiredBackupFiles(List<? extends Path> backupFiles) {
         if (BACKUP_MAX_HOURS > 0) {
             final long expiryMillis = System.currentTimeMillis() - (1L * BACKUP_MAX_HOURS * MS_PER_HOUR);
-            return backupFiles.stream().filter(file -> file.lastModified() < expiryMillis).collect(Collectors.toList());
+            FileTime expiryFileTime = FileTime.fromMillis(expiryMillis);
+            return backupFiles.stream()
+                    .filter(path -> {
+                        try {
+                            return Files.getLastModifiedTime(path).compareTo(expiryFileTime) < 0;
+                        } catch (IOException e) {
+                            log.warn("Can't get last modified time for {}", path.toAbsolutePath(), e);
+                            return false;
+                        }
+                    })
+                    .collect(Collectors.toList());
         } else {
-            return EMPTY_FILE_LIST;
+            return Collections.emptyList();
         }
     }
 
@@ -448,7 +502,7 @@ public class Save extends AbstractAction {
      */
     private static boolean checkAcceptableForTestFragment(JMeterTreeNode[] nodes) {
         return Arrays.stream(nodes).map(DefaultMutableTreeNode::getUserObject)
-                .noneMatch(o -> o instanceof ThreadGroup || o instanceof TestPlan);
+                .noneMatch(o -> o instanceof AbstractThreadGroup || o instanceof TestPlan);
     }
 
     // package protected to allow access from test code
@@ -460,27 +514,4 @@ public class Save extends AbstractAction {
             tree.replaceKey(item, testElement);
         }
     }
-
-    private static class PrivatePatternFileFilter implements IOFileFilter {
-
-        private Pattern pattern;
-
-        public PrivatePatternFileFilter(Pattern pattern) {
-            if(pattern == null) {
-                throw new IllegalArgumentException("pattern cannot be null !"); //$NON-NLS-1$
-            }
-            this.pattern = pattern;
-        }
-
-        @Override
-        public boolean accept(File dir, String fileName) {
-            return pattern.matcher(fileName).matches();
-        }
-
-        @Override
-        public boolean accept(File file) {
-            return accept(file.getParentFile(), file.getName());
-        }
-    }
-
 }

@@ -24,8 +24,6 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.text.StringEscapeUtils;
 import org.apache.jmeter.processor.PostProcessor;
 import org.apache.jmeter.samplers.SampleResult;
 import org.apache.jmeter.testelement.AbstractScopedTestElement;
@@ -34,8 +32,11 @@ import org.apache.jmeter.threads.JMeterContext;
 import org.apache.jmeter.threads.JMeterVariables;
 import org.apache.jmeter.util.Document;
 import org.apache.jmeter.util.JMeterUtils;
+import org.apache.jorphan.util.StringUtilities;
+import org.jetbrains.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.unbescape.html.HtmlEscape;
 
 /**
  * Extracts Strings from a text response between a start and end boundary.
@@ -91,17 +92,17 @@ public class BoundaryExtractor extends AbstractScopedTestElement implements Post
         if (log.isDebugEnabled()) {
             log.debug("Boundary Extractor {}: processing result", getName());
         }
-        if (StringUtils.isEmpty(getRefName())) {
+        String refName = getRefName();
+        if (StringUtilities.isEmpty(refName)) {
             throw new IllegalArgumentException(
                     "One of the mandatory properties is missing in Boundary Extractor:" + getName());
         }
 
         JMeterVariables vars = context.getVariables();
 
-        String refName = getRefName();
         final String defaultValue = getDefaultValue();
 
-        if (StringUtils.isNotBlank(defaultValue) || isEmptyDefaultValue()) {
+        if (StringUtilities.isNotBlank(defaultValue) || isEmptyDefaultValue()) {
             vars.put(refName, defaultValue);
         }
 
@@ -162,7 +163,7 @@ public class BoundaryExtractor extends AbstractScopedTestElement implements Post
      * @param matches List of String
      * @return 0 if there is only one match, else the number of matches, this is used to remove
      */
-    private int saveMatches(JMeterVariables vars, String refName, int matchNumber, List<String> matches) {
+    private static int saveMatches(JMeterVariables vars, String refName, int matchNumber, List<String> matches) {
         if (matchNumber >=0 && matches.isEmpty()) {
             return 0;
         }
@@ -178,14 +179,14 @@ public class BoundaryExtractor extends AbstractScopedTestElement implements Post
         return matchCount;
     }
 
-    private void saveRandomMatch(JMeterVariables vars, String refName, List<String> matches) {
+    private static void saveRandomMatch(JMeterVariables vars, String refName, List<String> matches) {
         String match = matches.get(JMeterUtils.getRandomInt(matches.size()));
         if (match != null) {
             vars.put(refName, match);
         }
     }
 
-    private void saveOneMatch(JMeterVariables vars, String refName, List<String> matches) {
+    private static void saveOneMatch(JMeterVariables vars, String refName, List<String> matches) {
         if (matches.size() == 1) { // if not then invalid matchNum was likely supplied
             String match = matches.get(0);
             if (match != null) {
@@ -194,7 +195,7 @@ public class BoundaryExtractor extends AbstractScopedTestElement implements Post
         }
     }
 
-    private void saveAllMatches(JMeterVariables vars, String refName, List<String> matches) {
+    private static void saveAllMatches(JMeterVariables vars, String refName, List<String> matches) {
         vars.put(refName + REF_MATCH_NR, Integer.toString(matches.size()));
         for (int i = 0; i < matches.size(); i++) {
             String match = matches.get(i);
@@ -228,7 +229,7 @@ public class BoundaryExtractor extends AbstractScopedTestElement implements Post
             return result.getResponseMessage(); // Bug 43451
         }
         if (useUnescapedBody()) {
-            return StringEscapeUtils.unescapeHtml4(result.getResponseDataAsString());
+            return HtmlEscape.unescapeHtml(result.getResponseDataAsString());
         }
         if (useBodyAsDocument()) {
             return Document.getTextFromDocument(result.getResponseData());
@@ -236,11 +237,12 @@ public class BoundaryExtractor extends AbstractScopedTestElement implements Post
         return result.getResponseDataAsString(); // Bug 36898
     }
 
-    private List<String> extract(
+    @VisibleForTesting
+    static List<String> extract(
             String leftBoundary, String rightBoundary, int matchNumber, Stream<String> previousResults) {
         boolean allItems = matchNumber <= 0;
         return previousResults
-                .flatMap(input -> extractAll(leftBoundary, rightBoundary, input).stream())
+                .flatMap(input -> extract(leftBoundary, rightBoundary, input).stream())
                 .skip(allItems ? 0L : matchNumber - 1)
                 .limit(allItems ? Long.MAX_VALUE : 1L)
                 .collect(Collectors.toList());
@@ -257,12 +259,13 @@ public class BoundaryExtractor extends AbstractScopedTestElement implements Post
      * @param inputString   text in which to look for the fragments
      * @return list where the found text fragments will be placed
      */
-    private List<String> extract(String leftBoundary, String rightBoundary, int matchNumber, String inputString) {
-        if (StringUtils.isBlank(inputString)) {
+    @VisibleForTesting
+    static List<String> extract(String leftBoundary, String rightBoundary, int matchNumber, String inputString) {
+        if (StringUtilities.isBlank(inputString)) {
             return Collections.emptyList();
         }
-        boolean isEmptyLeftBoundary = StringUtils.isEmpty(leftBoundary);
-        boolean isEmptyRightBoundary = StringUtils.isEmpty(rightBoundary);
+        boolean isEmptyLeftBoundary = StringUtilities.isEmpty(leftBoundary);
+        boolean isEmptyRightBoundary = StringUtilities.isEmpty(rightBoundary);
         if (isEmptyLeftBoundary && isEmptyRightBoundary) {
             return Collections.singletonList(inputString);
         }
@@ -303,6 +306,11 @@ public class BoundaryExtractor extends AbstractScopedTestElement implements Post
     }
 
     public List<String> extractAll(
+            String leftBoundary, String rightBoundary, String textToParse) {
+        return extract(leftBoundary, rightBoundary, textToParse);
+    }
+
+    private static List<String> extract(
             String leftBoundary, String rightBoundary, String textToParse) {
         return extract(leftBoundary, rightBoundary, -1, textToParse);
     }
@@ -395,7 +403,7 @@ public class BoundaryExtractor extends AbstractScopedTestElement implements Post
 
     public boolean useBody() {
         String prop = getPropertyAsString(MATCH_AGAINST);
-        return prop.length() == 0 || USE_BODY.equalsIgnoreCase(prop);
+        return prop.isEmpty() || USE_BODY.equalsIgnoreCase(prop);
     }
 
     public boolean useUnescapedBody() {

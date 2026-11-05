@@ -22,12 +22,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 
-import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.stream.Stream;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.config.Arguments;
 import org.apache.jmeter.protocol.http.config.GraphQLRequestParams;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,29 +35,34 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 
 class TestGraphQLRequestParamUtils {
 
     private static final String OPERATION_NAME = "";
 
-    private static final String QUERY =
-            "query($id: ID!) {\n"
-            + "  droid(id: $id) {\n"
-            + "    id\n"
-            + "    name\n"
-            + "    friends {\n"
-            + "      id\n"
-            + "      name\n"
-            + "      appearsIn\n"
-            + "    }\n"
-            + "  }\n"
-            + "}\n";
+    private static final String QUERY = """
+            query($id: ID!) {
+              droid(id: $id) {
+                id
+                name
+                friends {
+                  id
+                  name
+                  appearsIn
+                }
+              }
+            }
+            """;
 
-    private static final String VARIABLES =
-            "{\n"
-            + "  \"id\": \"2001\"\n"
-            + "}\n";
+    private static final String VARIABLES = """
+            {
+              "id": "2001"
+            }
+            """;
 
     private static final String EXPECTED_QUERY_GET_PARAM_VALUE =
             "query($id: ID!) { droid(id: $id) { id name friends { id name appearsIn } } }";
@@ -69,8 +73,13 @@ class TestGraphQLRequestParamUtils {
             "{"
             + "\"operationName\":null,"
             + "\"variables\":" + EXPECTED_VARIABLES_GET_PARAM_VALUE + ","
-            + "\"query\":\"" + StringUtils.replace(QUERY.trim(), "\n", "\\n") + "\""
+            + "\"query\":\"" + (QUERY.trim() == null ? null : QUERY.trim().replace("\n", "\\n")) + "\""
             + "}";
+
+    private static final ObjectMapper OBJECT_MAPPER = JsonMapper.builder()
+            // See https://github.com/FasterXML/jackson-core/issues/991
+            .enable(StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION)
+            .build();;
 
     private GraphQLRequestParams params;
 
@@ -81,7 +90,7 @@ class TestGraphQLRequestParamUtils {
 
     @ParameterizedTest
     @ValueSource(strings = { "application/json", "application/json;charset=utf-8", "application/json; charset=utf-8" })
-    void testIsGraphQLContentType(String contentType) throws Exception {
+    void testIsGraphQLContentType(String contentType) {
         assertTrue(GraphQLRequestParamUtils.isGraphQLContentType(contentType));
     }
 
@@ -97,20 +106,32 @@ class TestGraphQLRequestParamUtils {
         assertFalse(GraphQLRequestParamUtils.isGraphQLContentType(contentType));
     }
 
-    @Test
-    void testToPostBodyString() throws Exception {
-        assertEquals(EXPECTED_POST_BODY, GraphQLRequestParamUtils.toPostBodyString(params));
+    static Stream<org.junit.jupiter.params.provider.Arguments> postBodyFieldNameAndJsonNodes() throws Exception {
+        final JsonNode expectedPostBodyJson = OBJECT_MAPPER.readTree(EXPECTED_POST_BODY);
+        final JsonNode actualPostBodyJson = OBJECT_MAPPER.readTree(
+                GraphQLRequestParamUtils.toPostBodyString(new GraphQLRequestParams(OPERATION_NAME, QUERY, VARIABLES)));
+        return Stream.of(
+                arguments(GraphQLRequestParamUtils.OPERATION_NAME_FIELD, expectedPostBodyJson, actualPostBodyJson),
+                arguments(GraphQLRequestParamUtils.VARIABLES_FIELD, expectedPostBodyJson, actualPostBodyJson),
+                arguments(GraphQLRequestParamUtils.QUERY_FIELD, expectedPostBodyJson, actualPostBodyJson));
+    }
+
+    @ParameterizedTest
+    @MethodSource("postBodyFieldNameAndJsonNodes")
+    void testFieldInJsonFromToPostBodyString(String fieldName, JsonNode expectedNode, JsonNode actualNode) {
+        assertEquals(expectedNode.get(fieldName), actualNode.get(fieldName),
+                "The value of the '" + fieldName + "' field doesn't match in " + actualNode);
     }
 
     @Test
-    void testQueryToGetParamValue() throws Exception {
+    void testQueryToGetParamValue() {
         assertEquals(EXPECTED_QUERY_GET_PARAM_VALUE, GraphQLRequestParamUtils.queryToGetParamValue(params.getQuery()));
     }
 
     @Test
     void testVariablesToGetParamValue() throws Exception {
-        assertEquals(EXPECTED_VARIABLES_GET_PARAM_VALUE,
-                GraphQLRequestParamUtils.variablesToGetParamValue(params.getVariables()));
+        assertEquals(OBJECT_MAPPER.readTree(EXPECTED_VARIABLES_GET_PARAM_VALUE),
+                OBJECT_MAPPER.readTree(GraphQLRequestParamUtils.variablesToGetParamValue(params.getVariables())));
     }
 
     @Test
@@ -132,24 +153,20 @@ class TestGraphQLRequestParamUtils {
 
     @ParameterizedTest
     @ValueSource(strings = { "", "{}"})
-    void testInvalidJsonData(String postDataAsString) throws JsonProcessingException, UnsupportedEncodingException {
+    void testInvalidJsonData(String postDataAsString) {
         byte[] postData = postDataAsString.getBytes(StandardCharsets.UTF_8);
         assertThrows(IllegalArgumentException.class,
-                () -> {
-                    GraphQLRequestParamUtils.toGraphQLRequestParams(postData, null);
-                });
+                () -> GraphQLRequestParamUtils.toGraphQLRequestParams(postData, null));
     }
 
     @ParameterizedTest
     @ValueSource(strings = { "{\"query\":\"select * from emp\"}",
             "{\"operationName\":{\"id\":123},\"query\":\"query { droid { id }}\"}",
             "{\"variables\":\"r2d2\",\"query\":\"query { droid { id }}\"}" })
-    void testInvalidGraphQueryParam(String postDataAsString)
-            throws JsonProcessingException, UnsupportedEncodingException {
+    void testInvalidGraphQueryParam(String postDataAsString) {
         byte[] postData = postDataAsString.getBytes(StandardCharsets.UTF_8);
-        assertThrows(IllegalArgumentException.class, () -> {
-            GraphQLRequestParamUtils.toGraphQLRequestParams(postData, null);
-        });
+        assertThrows(IllegalArgumentException.class,
+                () -> GraphQLRequestParamUtils.toGraphQLRequestParams(postData, null));
     }
 
     @Test
@@ -186,14 +203,14 @@ class TestGraphQLRequestParamUtils {
     }
 
     @Test
-    void testMissingParams() throws UnsupportedEncodingException {
+    void testMissingParams() {
         Arguments args = new Arguments();
         assertThrows(IllegalArgumentException.class,
                 () -> GraphQLRequestParamUtils.toGraphQLRequestParams(args, null));
     }
 
     @Test
-    void testInvalidQueryParam() throws UnsupportedEncodingException {
+    void testInvalidQueryParam() {
         Arguments args = new Arguments();
         args.addArgument(new HTTPArgument("query", "select * from emp", "=", false));
         assertThrows(IllegalArgumentException.class,
@@ -201,7 +218,7 @@ class TestGraphQLRequestParamUtils {
     }
 
     @Test
-    void testInvalidQueryParamVariables() throws UnsupportedEncodingException {
+    void testInvalidQueryParamVariables() {
         Arguments args = new Arguments();
         args.addArgument(new HTTPArgument("query", "query { droid { id }}", "=", false));
         args.addArgument(new HTTPArgument("variables", "r2d2", "=", false));

@@ -15,49 +15,62 @@
  * limitations under the License.
  */
 
+import com.github.autostyle.gradle.AutostyleTask
+import com.github.gradle.node.yarn.task.YarnTask
 import com.github.vlsi.gradle.crlf.CrLfSpec
 import com.github.vlsi.gradle.crlf.LineEndings
 import com.github.vlsi.gradle.git.FindGitAttributes
 import com.github.vlsi.gradle.git.dsl.gitignore
 import com.github.vlsi.gradle.properties.dsl.props
-import kotlin.math.absoluteValue
 import org.gradle.api.internal.TaskOutputsInternal
+import kotlin.math.absoluteValue
 
 plugins {
+    id("build-logic.build-params")
     id("com.github.vlsi.crlf")
     id("com.github.vlsi.stage-vote-release")
+    id("build-logic.jvm-library")
+    id("com.github.node-gradle.node")
 }
 
 var jars = arrayOf(
-        ":src:bshclient",
-        ":src:launcher",
-        ":src:components",
-        ":src:core",
-        // ":src:examples",
-        ":src:functions",
-        ":src:jorphan",
-        ":src:protocol:bolt",
-        ":src:protocol:ftp",
-        ":src:protocol:http",
-        ":src:protocol:java",
-        ":src:protocol:jdbc",
-        ":src:protocol:jms",
-        ":src:protocol:junit",
-        ":src:protocol:ldap",
-        ":src:protocol:mail",
-        ":src:protocol:mongodb",
-        ":src:protocol:native",
-        ":src:protocol:tcp")
+    ":src:bshclient",
+    ":src:launcher",
+    ":src:components",
+    ":src:core",
+    // ":src:examples",
+    ":src:functions",
+    ":src:jorphan",
+    ":src:protocol:bolt",
+    ":src:protocol:ftp",
+    ":src:protocol:http",
+    ":src:protocol:java",
+    ":src:protocol:jdbc",
+    ":src:protocol:jms",
+    ":src:protocol:junit",
+    ":src:protocol:ldap",
+    ":src:protocol:mail",
+    ":src:protocol:native",
+    ":src:protocol:tcp"
+)
+
+// https://github.com/gradle/gradle/pull/16627
+inline fun <reified T : Named> AttributeContainer.attribute(attr: Attribute<T>, value: String) =
+    attribute(attr, objects.named<T>(value))
 
 // isCanBeConsumed = false ==> other modules must not use the configuration as a dependency
-val buildDocs by configurations.creating {
-    isCanBeConsumed = false
-}
 val generatorJar by configurations.creating {
     isCanBeConsumed = false
 }
 val junitSampleJar by configurations.creating {
     isCanBeConsumed = false
+    isTransitive = false
+    attributes {
+        attribute(Category.CATEGORY_ATTRIBUTE, Category.LIBRARY)
+        attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, LibraryElements.JAR)
+        attribute(Usage.USAGE_ATTRIBUTE, Usage.JAVA_RUNTIME)
+        attribute(Bundling.BUNDLING_ATTRIBUTE, Bundling.EXTERNAL)
+    }
 }
 val binLicense by configurations.creating {
     isCanBeConsumed = false
@@ -66,39 +79,52 @@ val srcLicense by configurations.creating {
     isCanBeConsumed = false
 }
 
-val allTestClasses by configurations.creating {
-    isCanBeConsumed = true
-    isCanBeResolved = false
-}
-
 // Note: you can inspect final classpath (list of jars in the binary distribution)  via
 // gw dependencies --configuration runtimeClasspath
 dependencies {
     for (p in jars) {
         api(project(p))
-        allTestClasses(project(p, "testClasses"))
+    }
+
+    runtimeOnly("commons-codec:commons-codec") {
+        because("commons-codec was a dependency in previous JMeter versions, so we keep it for compatibility")
+    }
+    runtimeOnly("commons-io:commons-io") {
+        because("commons-io was a dependency in previous JMeter versions, so we keep it for compatibility")
+    }
+    runtimeOnly("org.apache.commons:commons-text") {
+        because("commons-text was a dependency in previous JMeter versions, so we keep it for compatibility")
+    }
+    runtimeOnly("commons-collections:commons-collections") {
+        because("commons-collections was a dependency in previous JMeter versions, so we keep it for compatibility")
+    }
+    runtimeOnly("org.apache.commons:commons-collections4") {
+        because("commons-collections4 was a dependency in previous JMeter versions, so we keep it for compatibility")
     }
 
     binLicense(project(":src:licenses", "binLicense"))
     srcLicense(project(":src:licenses", "srcLicense"))
     generatorJar(project(":src:generator", "archives"))
-    junitSampleJar(project(":src:protocol:junit-sample", "archives"))
-
-    buildDocs(platform(project(":src:bom")))
-    buildDocs("org.apache.velocity:velocity")
-    buildDocs("commons-lang:commons-lang")
-    buildDocs("org.apache.commons:commons-collections4")
-    buildDocs("org.jdom:jdom")
+    junitSampleJar(project(":src:protocol:junit-sample"))
 }
 
-tasks.named(BasePlugin.CLEAN_TASK_NAME).configure {
-    doLast {
-        // createDist can't yet remove outdated jars (e.g. when dependency is updated to a newer version)
-        // so we enhance "clean" task to kill the jars
-        delete(fileTree("$rootDir/bin") { include("ApacheJMeter.jar") })
-        delete(fileTree("$rootDir/lib") { include("*.jar") })
-        delete(fileTree("$rootDir/lib/ext") { include("ApacheJMeter*.jar") })
-    }
+node {
+    // Do not declare the repository
+    // See https://github.com/node-gradle/gradle-node-plugin/blob/master/docs/faq.md#is-this-plugin-compatible-with-centralized-repositories-declaration
+    distBaseUrl = null
+    download = true
+    version = "25.1.0"
+    yarnVersion = "1.22.22"
+    // nodeProjectDir = rootProject.layout.projectDirectory.dir("xdocs")
+}
+
+tasks.clean {
+    // copyLibs uses Sync task, so it can't predict all the possible output files (e.g. from previous executions)
+    // So we register patterns to remove explicitly
+    delete(fileTree("$rootDir/bin") { include("ApacheJMeter.jar") })
+    delete(fileTree("$rootDir/lib") { include("*.jar") })
+    delete(fileTree("$rootDir/lib/ext") { include("ApacheJMeter*.jar") })
+    delete(fileTree("$rootDir/lib/junit") { include("test.jar") })
 }
 
 // Libs are populated dynamically since we can't get the full set of dependencies
@@ -121,16 +147,20 @@ val populateLibs by tasks.registering {
     doLast {
         val deps = configurations.runtimeClasspath.get().resolvedConfiguration.resolvedArtifacts
         // This ensures project exists, if project is renamed, names should be corrected here as wells
-        val launcherProject = project(":src:launcher").path
-        val bshclientProject = project(":src:bshclient").path
-        val jorphanProject = project(":src:jorphan").path
+        val launcherProject = projects.src.launcher.path
+        val bshclientProject = projects.src.bshclient.path
+        val jorphanProject = projects.src.jorphan.path
         listOf(libs, libsExt, binLibs).forEach {
-            it.fileMode = "644".toInt(8)
-            it.dirMode = "755".toInt(8)
+            it.filePermissions {
+                unix("rw-r--r--")
+            }
+            it.dirPermissions {
+                unix("rwxr-xr-x")
+            }
         }
         for (dep in deps) {
             val compId = dep.id.componentIdentifier
-            if (compId !is ProjectComponentIdentifier || !compId.build.isCurrentBuild) {
+            if (compId !is ProjectComponentIdentifier) {
                 // Move all non-JMeter jars to lib folder
                 libs.from(dep.file)
                 continue
@@ -149,7 +179,7 @@ val populateLibs by tasks.registering {
     }
 }
 
-val updateExpectedJars by props()
+val updateExpectedJars by props(default = gradle.startParameter.writeDependencyVerifications.isNotEmpty())
 
 val verifyReleaseDependencies by tasks.registering {
     description = "Verifies if binary release archive contains the expected set of external jars"
@@ -158,8 +188,16 @@ val verifyReleaseDependencies by tasks.registering {
     dependsOn(configurations.runtimeClasspath)
     val expectedLibs = file("src/dist/expected_release_jars.csv")
     inputs.file(expectedLibs)
-    val actualLibs = File(buildDir, "dist/expected_release_jars.csv")
+    inputs.property("updateExpectedJars", updateExpectedJars)
+    val actualLibs = layout.buildDirectory.file("dist/expected_release_jars.csv")
     outputs.file(actualLibs)
+    val ignoreJarsMismatch = version.toString().endsWith("-SNAPSHOT")
+    if (ignoreJarsMismatch || updateExpectedJars) {
+        // The task does not fail in case of -SNAPSHOT version, so we make the task never UP-TO-DATE
+        // in that case. Otherwise, the task never executes on the second request, even if the user runs with
+        // -PupdateExpectedJars
+        outputs.upToDateWhen { false }
+    }
     doLast {
         val caseInsensitive: Comparator<String> = compareBy(String.CASE_INSENSITIVE_ORDER, { it })
 
@@ -167,7 +205,7 @@ val verifyReleaseDependencies by tasks.registering {
         val libs = deps.asSequence()
             .filter {
                 val compId = it.id.componentIdentifier
-                compId !is ProjectComponentIdentifier || !compId.build.isCurrentBuild
+                compId !is ProjectComponentIdentifier
             }
             .map { it.file.name to it.file.length() }
             .sortedWith(compareBy(caseInsensitive) { it.first })
@@ -186,7 +224,7 @@ val verifyReleaseDependencies by tasks.registering {
         }
 
         val sb = StringBuilder()
-        sb.append("External dependencies differ (you could update ${expectedLibs.relativeTo(rootDir)} if you add -PupdateExpectedJars):")
+        sb.append("External dependencies differ (you could update ${expectedLibs.relativeTo(rootDir)} if you run $path -PupdateExpectedJars):")
 
         val sizeBefore = expected.values.sum()
         val sizeAfter = libs.values.sum()
@@ -202,7 +240,7 @@ val verifyReleaseDependencies by tasks.registering {
             sb.append("\n  ${expected.size} => ${libs.size} files")
             sb.append(" (${if (libs.size > expected.size) "+" else "-"}${(libs.size - expected.size).absoluteValue})")
         }
-        sb.appendln()
+        sb.appendLine()
         for (dep in (libs.keys + expected.keys).sortedWith(caseInsensitive)) {
             val old = expected[dep]
             val new = libs[dep]
@@ -218,12 +256,17 @@ val verifyReleaseDependencies by tasks.registering {
             sb.append(" ").append(dep)
         }
         val newline = System.getProperty("line.separator")
-        actualLibs.writeText(
+        val actualLibsFile = actualLibs.get().asFile
+        actualLibsFile.writeText(
             libs.map { "${it.value},${it.key}" }.joinToString(newline, postfix = newline)
         )
         if (updateExpectedJars) {
             println("Updating ${expectedLibs.relativeTo(rootDir)}")
-            actualLibs.copyTo(expectedLibs, overwrite = true)
+            actualLibsFile.copyTo(expectedLibs, overwrite = true)
+        } else if (ignoreJarsMismatch) {
+            // Renovate requires self-hosted runner for executing postUpgradeTasks,
+            // so we can't make Renovate to update expected_release_jars.csv at the moment
+            logger.lifecycle(sb.toString())
         } else {
             throw GradleException(sb.toString())
         }
@@ -270,6 +313,9 @@ val copyBinLibs by tasks.registering(Copy::class) {
     // Can't use $rootDir since Gradle somehow reports .gradle/caches/ as "always modified"
     rootSpec.into("$rootDir/bin")
     with(binLibs)
+    // :src:config:jar conflicts with copyBinLibs on bin, bin/templates, bin/report-template folders
+    // so we add explicit ordering
+    mustRunAfter(":src:config:jar")
 }
 
 val createDist by tasks.registering {
@@ -283,83 +329,7 @@ val createDist by tasks.registering {
 // source/binary artifacts with the appropriate eol/executable file flags
 val gitProps by rootProject.tasks.existing(FindGitAttributes::class)
 
-fun createAnakiaTask(
-    taskName: String,
-    baseDir: String,
-    extension: String = ".html",
-    style: String,
-    velocityProperties: String,
-    projectFile: String,
-    excludes: Array<String>,
-    includes: Array<String>
-): TaskProvider<Task> {
-    val outputDir = "$buildDir/docs/$taskName"
-
-    val prepareProps = tasks.register("prepareProperties$taskName") {
-        // AnakiaTask can't use relative paths, and it forbids ../, so we create a dedicated
-        // velocity.properties file that contains absolute path
-        inputs.file(velocityProperties)
-        val outputProps = "$buildDir/docProps/$taskName/velocity.properties"
-        outputs.file(outputProps)
-        doLast {
-            // Unfortunately, Velocity does not use Java properties format.
-            // For instance, Properties escape : as \:, however Velocity does not understand that.
-            // Thus it tries to use c\:\path\to\workspace which does not work
-            val p = `java.util`.Properties()
-            file(velocityProperties).reader().use {
-                p.load(it)
-            }
-            p["resource.loader"] = "file"
-            p["file.resource.loader.path"] = baseDir
-            p["file.resource.loader.class"] = "org.apache.velocity.runtime.resource.loader.FileResourceLoader"
-            val specials = Regex("""([,\\])""")
-            val lines = p.entries
-                .map { (it.key as String) + "=" + ((it.value as String).replace(specials, """\\$1""")) }
-                .sorted()
-            file(outputProps).apply {
-                parentFile.run { isDirectory || mkdirs() } || throw IllegalStateException("Unable to create directory $parentFile")
-
-                writer().use {
-                    it.appendln("# Auto-generated from $velocityProperties to pass absolute path to Velocity")
-                    for (line in lines) {
-                        it.appendln(line)
-                    }
-                }
-            }
-        }
-    }
-
-    return tasks.register(taskName) {
-        inputs.file("$baseDir/$style")
-        inputs.file("$baseDir/$projectFile")
-        inputs.files(fileTree(baseDir) {
-            include(*includes)
-            exclude(*excludes)
-        })
-        inputs.property("extension", extension)
-        outputs.dir(outputDir)
-        dependsOn(prepareProps)
-
-        doLast {
-            ant.withGroovyBuilder {
-                "taskdef"("name" to "anakia",
-                        "classname" to "org.apache.velocity.anakia.AnakiaTask",
-                        "classpath" to buildDocs.asPath)
-                "anakia"("basedir" to baseDir,
-                        "destdir" to outputDir,
-                        "extension" to extension,
-                        "style" to style,
-                        "projectFile" to projectFile,
-                        "excludes" to excludes.joinToString(" "),
-                        "includes" to includes.joinToString(" "),
-                        "lastModifiedCheck" to "true",
-                        "velocityPropertiesFile" to prepareProps.get().outputs.files.singleFile)
-            }
-        }
-    }
-}
-
-val xdocs = "$rootDir/xdocs"
+val xdocs = rootProject.layout.projectDirectory.dir("xdocs")
 
 fun CopySpec.docCssAndImages() {
     from(xdocs) {
@@ -377,31 +347,51 @@ fun CopySpec.manuals() {
     }
 }
 
-fun CopySpec.printableDocumentation() {
-    into("docs") {
-        docCssAndImages()
+fun CopySpec.docFontsAndCss() {
+    into("fonts") {
+        from(
+            fileTree(xdocs.dir("node_modules/@fontsource/merriweather/files")) {
+                builtBy(yarn_install)
+            }
+        ) {
+            include("*400*normal*.woff2")
+        }
+        from(xdocs.dir("node_modules/@fortawesome/fontawesome-free/webfonts")) {
+            include("fa-brands*.woff2")
+        }
     }
-    into("printable_docs") {
-        from(buildPrintableDoc)
-        manuals()
+    into("css") {
+        from(xdocs.dir("node_modules/@fontsource/merriweather")) {
+            include("400.css")
+            rename { "merriweather.css" }
+            filter {
+                it.replace("./files", "../fonts")
+            }
+        }
+        from(xdocs.dir("node_modules/@fortawesome/fontawesome-free/css")) {
+            include("fontawesome.min.css")
+            include("brands.min.css")
+            filter {
+                it.replace("../webfonts", "../fonts")
+            }
+        }
     }
 }
 
-val buildPrintableDoc = createAnakiaTask("buildPrintableDoc", baseDir = xdocs,
-        style = "stylesheets/site_printable.vsl",
-        velocityProperties = "$xdocs/velocity.properties",
-        projectFile = "stylesheets/printable_project.xml",
-        excludes = arrayOf("**/stylesheets/**", "extending.xml", "extending/*.xml"),
-        includes = arrayOf("**/*.xml"))
+tasks.yarnSetup {
+    mustRunAfter(tasks.withType<AutostyleTask>())
+}
 
-val previewPrintableDocs by tasks.registering(Copy::class) {
-    group = JavaBasePlugin.DOCUMENTATION_GROUP
-    description = "Creates preview of a printable documentation to build/docs/printable_preview"
-    into("$buildDir/docs/printable_preview")
-    CrLfSpec().run {
-        gitattributes(gitProps)
-        printableDocumentation()
-    }
+tasks.nodeSetup {
+    mustRunAfter(tasks.withType<AutostyleTask>())
+}
+
+val yarn_install = tasks.named<YarnTask>("yarn_install") {
+    workingDir = xdocs
+    mustRunAfter(":rat")
+    inputs.file(xdocs.file("package.json")).withPropertyName("package_json").withPathSensitivity(PathSensitivity.NONE)
+    outputs.file(xdocs.file("yarn.lock")).withPropertyName("yarn.lock")
+    outputs.dir(xdocs.dir("node_modules")).withPropertyName("node_modules")
 }
 
 val lastEditYear: String by rootProject.extra
@@ -415,7 +405,8 @@ fun xslt(
 
     val relativePath = if (subdir.isEmpty()) "." else ".."
     ant.withGroovyBuilder {
-        "xslt"("style" to "$xdocs/stylesheets/website-style.xsl",
+        "xslt"(
+            "style" to "$xdocs/stylesheets/website-style.xsl",
             "basedir" to "$xdocs/$subdir",
             "destdir" to "$outputDir/$subdir",
             "excludes" to excludes.joinToString(" "),
@@ -429,17 +420,25 @@ fun xslt(
 }
 
 val processSiteXslt by tasks.registering {
-    val outputDir = "$buildDir/siteXslt"
-    inputs.files(xdocs)
+    val outputDir = layout.buildDirectory.dir("siteXslt").get().asFile
+    inputs.files(
+        fileTree(xdocs) {
+            exclude("node_modules")
+            exclude("package.json")
+            exclude("package-lock.json")
+            exclude("yarn.lock")
+        }
+    ).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName("xdocs")
     inputs.property("year", lastEditYear)
     outputs.dir(outputDir)
+    outputs.cacheIf { true }
 
     doLast {
         for (f in (outputs as TaskOutputsInternal).previousOutputFiles) {
             f.delete()
         }
         for (i in arrayOf("", "usermanual", "localising")) {
-            xslt(i, outputDir)
+            xslt(i, outputDir.absolutePath)
         }
     }
 }
@@ -453,10 +452,12 @@ fun CopySpec.siteLayout() {
     from(processSiteXslt)
     docCssAndImages()
     manuals()
+    docFontsAndCss()
 }
 
 // See https://github.com/gradle/gradle/issues/10960
-val previewSiteDir = buildDir.resolve("site")
+val previewSiteDir = layout.buildDirectory.dir("site")
+
 val previewSite by tasks.registering(Sync::class) {
     group = JavaBasePlugin.DOCUMENTATION_GROUP
     description = "Creates preview of a site to build/docs/site"
@@ -464,6 +465,9 @@ val previewSite by tasks.registering(Sync::class) {
     CrLfSpec().run {
         gitattributes(gitProps)
         siteLayout()
+    }
+    doLast {
+        println("Site preview synchronized to ${previewSiteDir.get().file("index.html")}")
     }
 }
 
@@ -507,7 +511,12 @@ fun CrLfSpec.binaryLayout() = copySpec {
                 with(libsExt)
             }
         }
-        printableDocumentation()
+        into("docs") {
+            from(processSiteXslt)
+            docCssAndImages()
+            manuals()
+            docFontsAndCss()
+        }
         into("docs/api") {
             javadocs()
         }
@@ -526,6 +535,10 @@ fun CrLfSpec.sourceLayout() = copySpec {
         from(rootDir) {
             gitignore(gitProps)
             excludeLicenseFromSourceRelease()
+            exclude("xdocs/node_modules")
+            exclude("xdocs/package.json")
+            exclude("xdocs/package-lock.json")
+            exclude("xdocs/yarn.lock")
         }
     }
 }
@@ -540,19 +553,17 @@ val javadocAggregate by tasks.registering(Javadoc::class) {
     // Aggregate javadoc needs to include generated JMeterVersion class
     // So we use delay computation of source files
     setSource(sourceSets.map { set -> set.map { it.allJava } })
-    setDestinationDir(file("$buildDir/docs/javadocAggregate"))
+    setDestinationDir(layout.buildDirectory.dir("docs/javadocAggregate").get().asFile)
 }
-
-val skipDist: Boolean by rootProject.extra
 
 // Generates distZip, distTar, distZipSource, and distTarSource tasks
 // The archives and checksums are put to build/distributions
 for (type in listOf("binary", "source")) {
-    if (skipDist) {
+    if (buildParameters.skipDist) {
         break
     }
     for (archive in listOf(Zip::class, Tar::class)) {
-        val taskName = "dist${archive.simpleName}${type.replace("binary", "").capitalize()}"
+        val taskName = "dist${archive.simpleName}${type.replace("binary", "").replaceFirstChar { it.titlecaseChar() }}"
         val archiveTask = tasks.register(taskName, archive) {
             val eol = if (archive == Tar::class) LineEndings.LF else LineEndings.CRLF
             group = distributionGroup
@@ -560,6 +571,11 @@ for (type in listOf("binary", "source")) {
             if (this is Tar) {
                 compression = Compression.GZIP
             }
+            // dist task excludes jar files from bin/, and lib/ however Gradle does not see that
+            // So we add an artificial dependency
+            mustRunAfter(copyBinLibs)
+            mustRunAfter(copyLibs)
+            mustRunAfter(":src:dist-check:copyExtraTestLibs")
             // Gradle does not track "filters" as archive/copy task dependencies,
             // So a mere change of a file attribute won't trigger re-execution of a task
             // So we add a custom property to re-execute the task in case attributes change
@@ -593,9 +609,12 @@ val runGui by tasks.registering(JavaExec::class) {
     group = "Development"
     description = "Builds and starts JMeter GUI"
     dependsOn(createDist)
+    buildParameters.testJdk?.let {
+        javaLauncher.set(javaToolchains.launcherFor(it))
+    }
 
     workingDir = File(project.rootDir, "bin")
-    main = "org.apache.jmeter.NewDriver"
+    mainClass.set("org.apache.jmeter.NewDriver")
     classpath("$rootDir/bin/ApacheJMeter.jar")
     jvmArgs("-Xss256k")
     jvmArgs("-XX:MaxMetaspaceSize=256m")

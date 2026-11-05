@@ -38,7 +38,7 @@
   <xsl:param name="cssdir" select="concat($relative-path, '/css')" />
   <xsl:param name="apidir" select="concat($relative-path, '/api')" />
   <xsl:param name="jakarta-site" select="'https://jakarta.apache.org'" />
-  <xsl:param name="year" select="'2021'" />
+  <xsl:param name="year" select="'2024'" />
   <xsl:param name="max-img-width" select="'600'" />
 
   <!-- Output method -->
@@ -67,11 +67,15 @@
         <!-- VIEWPORT -->
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link
-          href='https://fonts.googleapis.com/css?family=Merriweather:400normal'
+          href="{concat($cssdir, '/merriweather.css')}"
           rel='stylesheet' type='text/css'
         ></link>
         <link
-          href="https://maxcdn.bootstrapcdn.com/font-awesome/4.6.1/css/font-awesome.min.css"
+          href="{concat($cssdir, '/fontawesome.min.css')}"
+          rel="stylesheet" type='text/css'
+        ></link>
+        <link
+          href="{concat($cssdir, '/brands.min.css')}"
           rel="stylesheet" type='text/css'
         ></link>
         <link rel="stylesheet" type="text/css"
@@ -179,8 +183,8 @@
   <xsl:template name="social-media-links">
     <div class="social-media">
       <ul class="social-media-links">
-        <li class="twitter"><a href="https://twitter.com/ApacheJMeter" title="Follow us on Twitter"><i class="fa fa-twitter" aria-hidden="true"></i>Twitter</a></li>
-        <li class="github"><a href="https://github.com/apache/jmeter" title="Fork us on github"><i class="fa fa-github" aria-hidden="true"></i>github</a></li>
+        <li class="twitter"><a href="https://twitter.com/ApacheJMeter" title="Follow us on Twitter"><i class="fa-brands fa-twitter" aria-hidden="true"></i>Twitter</a></li>
+        <li class="github"><a href="https://github.com/apache/jmeter" title="Fork us on github"><i class="fa-brands fa-github" aria-hidden="true"></i>github</a></li>
       </ul>
     </div>
   </xsl:template>
@@ -189,8 +193,8 @@
     <div class="share-links">
       Share this page:
       <ul>
-        <li class="fb"><a data-social-url="https://facebook.com/sharer/sharer.php?u=" title="Share on facebook"><i class="fa fa-facebook" aria-hidden="true"></i>share</a></li>
-        <li class="twitter"><a data-social-url="https://twitter.com/intent/tweet?url=" title="Tweet on twitter"><i class="fa fa-twitter" aria-hidden="true"></i>tweet</a></li>
+        <li class="fb"><a data-social-url="https://facebook.com/sharer/sharer.php?u=" title="Share on facebook"><i class="fa-brands fa-facebook" aria-hidden="true"></i>share</a></li>
+        <li class="twitter"><a data-social-url="https://twitter.com/intent/tweet?url=" title="Tweet on twitter"><i class="fa-brands fa-twitter" aria-hidden="true"></i>tweet</a></li>
       </ul>
     </div>
   </xsl:template>
@@ -552,7 +556,7 @@
       Bug
       <xsl:value-of select="./text()" />
     </a>
-    -
+    <xsl:call-template name="issue_separator"/>
   </xsl:template>
 
   <xsl:template match="rfc">
@@ -566,30 +570,34 @@
     </xsl:choose>
   </xsl:template>
 
-  <xsl:template match="pr[following-sibling::pr or following-sibling::bug]">
-    <a href="https://github.com/apache/jmeter/pull/{./text()}">
-      Pull request #<xsl:value-of select="./text()" />
-    </a>,
-  </xsl:template>
-
-  <xsl:template match="pr[not(following-sibling::pr) and (not(preceding-sibling::*) or preceding-sibling::bug or preceding-sibling::pr)]">
-    <a href="https://github.com/apache/jmeter/pull/{./text()}">
-      Pull request #<xsl:value-of select="./text()" />
-    </a>
-    -
-  </xsl:template>
-
   <xsl:template match="pr">
     <a href="https://github.com/apache/jmeter/pull/{./text()}">
-      Pull request #<xsl:value-of select="./text()" />
+      PR#<xsl:value-of select="./text()" />
     </a>
+    <xsl:call-template name="issue_separator"/>
+  </xsl:template>
+
+  <xsl:template match="issue">
+    <a href="https://github.com/apache/jmeter/issues/{./text()}">
+      Issue#<xsl:value-of select="./text()" />
+    </a>
+    <xsl:call-template name="issue_separator"/>
+  </xsl:template>
+
+  <xsl:template name="issue_separator">
+    <xsl:choose>
+      <xsl:when test="following-sibling::issue or following-sibling::pr or following-sibling::bug">, </xsl:when>
+      <!-- If preceding element is text, then avoid adding "," or "-". It looks like inline reference to an issue, PR -->
+      <xsl:when test="preceding-sibling::text()[normalize-space() != '']"/>
+      <xsl:otherwise> &ndash; </xsl:otherwise>
+    </xsl:choose>
   </xsl:template>
 
   <xsl:template match="links">
     <div class="links">
       <div class="title">See also:</div>
       <ul class="links">
-        <xsl:for-each select="link|complink">
+        <xsl:for-each select="link|complink|funclink">
           <li>
             <xsl:choose>
               <xsl:when test="name(.) = 'link'">
@@ -599,6 +607,11 @@
               </xsl:when>
               <xsl:when test="name(.) = 'complink'">
                 <xsl:call-template name="complink">
+                  <xsl:with-param name="name" select="@name" />
+                </xsl:call-template>
+              </xsl:when>
+              <xsl:when test="name(.) = 'funclink'">
+                <xsl:call-template name="funclink">
                   <xsl:with-param name="name" select="@name" />
                 </xsl:call-template>
               </xsl:when>

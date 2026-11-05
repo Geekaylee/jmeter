@@ -17,10 +17,12 @@
 
 plugins {
     `java-test-fixtures`
+    id("build-logic.jvm-library")
 }
 
 dependencies {
-    api("com.github.tomakehurst:wiremock-jre8")
+    api(platform(projects.src.bomTesting))
+    api("org.wiremock:wiremock-jetty12")
     api("org.junit.jupiter:junit-jupiter-api")
 }
 

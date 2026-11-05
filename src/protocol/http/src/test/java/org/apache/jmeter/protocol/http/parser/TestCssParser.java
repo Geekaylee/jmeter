@@ -17,19 +17,17 @@
 
 package org.apache.jmeter.protocol.http.parser;
 
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.CoreMatchers.not;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.collection.IsEmptyCollection.empty;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
-import org.apache.commons.collections4.IteratorUtils;
 import org.apache.jmeter.junit.JMeterTestCase;
-import org.hamcrest.CoreMatchers;
 import org.junit.jupiter.api.Test;
 
 public class TestCssParser extends JMeterTestCase {
@@ -47,24 +45,24 @@ public class TestCssParser extends JMeterTestCase {
     public void testGetEmbeddedResourceURLsNoUrls() throws Exception {
         CssParser nonIgnoreParser = new CssParser();
         List<URL> result = extractUrls(nonIgnoreParser, "..");
-        assertThat(result, is(empty()));
+        assertEquals("[]", result.toString());
     }
 
     @Test
     public void testGetEmbeddedResourceURLsnOneUrl() throws Exception {
         List<URL> result = extractUrls("@import url(http://example.com/abc.css);");
-        assertThat(result, is(not(empty())));
+        assertEquals("[http://example.com/abc.css]", result.toString());
     }
 
     @Test
     public void testExtractUrlsFromBrokenData() throws Exception {
         List<URL> result = extractUrls(CSS_IN_ERROR);
-        assertThat(result, is(empty()));
+        assertEquals("[]", result.toString());
     }
 
     @Test
     public void testIsReusable() {
-        assertThat(parser.isReusable(), CoreMatchers.is(true));
+        assertTrue(parser.isReusable());
     }
 
     private List<URL> extractUrls(String css) throws LinkExtractorParseException,
@@ -72,12 +70,14 @@ public class TestCssParser extends JMeterTestCase {
         return extractUrls(parser, css);
     }
 
-    private List<URL> extractUrls(CssParser parser, String css)
+    private static List<URL> extractUrls(CssParser parser, String css)
             throws LinkExtractorParseException, MalformedURLException {
-        List<URL> result = IteratorUtils.toList(parser.getEmbeddedResourceURLs(
+        List<URL> result = new ArrayList<>();
+        Iterator<URL> urlIterator = parser.getEmbeddedResourceURLs(
                 "Mozilla", css.getBytes(StandardCharsets.UTF_8), new URL(
                         "http://example.org/"), StandardCharsets.UTF_8
-                        .displayName()));
+                        .displayName());
+        urlIterator.forEachRemaining(result::add);
         return result;
     }
 }

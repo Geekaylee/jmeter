@@ -18,13 +18,10 @@
 package org.apache.jmeter.functions;
 
 import static org.apache.jmeter.functions.FunctionTestHelper.makeParams;
-import static org.hamcrest.CoreMatchers.equalTo;
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 
@@ -34,6 +31,7 @@ import org.apache.jmeter.samplers.SampleResult;
 import org.apache.jmeter.threads.JMeterContext;
 import org.apache.jmeter.threads.JMeterContextService;
 import org.apache.jmeter.threads.JMeterVariables;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -46,7 +44,7 @@ public class TestTimeRandomDateFunction extends JMeterTestCase {
     private String value;
 
     @BeforeEach
-    public void setUp() {
+    void setUp() {
         jmctx = JMeterContextService.getContext();
         vars = new JMeterVariables();
         jmctx.setVariables(vars);
@@ -56,12 +54,12 @@ public class TestTimeRandomDateFunction extends JMeterTestCase {
     }
 
     @Test
-    public void testParameterCount() throws Exception {
+    void testParameterCount() throws Exception {
         checkInvalidParameterCounts(function, 3, 5);
     }
 
     @Test
-    public void testDefault() throws Exception {
+    void testDefault() throws Exception {
         String endDate = "2099-01-01";
         String formatDate = "yyyy-dd-MM";
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern(formatDate);
@@ -69,13 +67,13 @@ public class TestTimeRandomDateFunction extends JMeterTestCase {
         function.setParameters(params);
         value = function.execute(result, null);
         LocalDate result = LocalDate.parse(value, formatter);
-        LocalDate now = LocalDate.now();
+        LocalDate now = LocalDate.now(ZoneId.systemDefault());
         LocalDate max = LocalDate.parse(endDate, formatter);
-        assertTrue(now.isBefore(result) && result.isBefore(max));
+        Assertions.assertTrue(now.isBefore(result) && result.isBefore(max));
     }
 
     @Test
-    public void testDefault2() throws Exception {
+    void testDefault2() throws Exception {
         String endDate = "2099-01-01";
         Collection<CompoundVariable> params = makeParams("yyyy-dd-MM", "", endDate, "", "");
         function.setParameters(params);
@@ -84,7 +82,7 @@ public class TestTimeRandomDateFunction extends JMeterTestCase {
     }
 
     @Test
-    public void testFormatDate() throws Exception {
+    void testFormatDate() throws Exception {
         String endDate = "01 01 2099";
         String formatDate = "dd MM yyyy";
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern(formatDate);
@@ -92,13 +90,13 @@ public class TestTimeRandomDateFunction extends JMeterTestCase {
         function.setParameters(params);
         value = function.execute(result, null);
         LocalDate result = LocalDate.parse(value, formatter);
-        LocalDate now = LocalDate.now();
+        LocalDate now = LocalDate.now(ZoneId.systemDefault());
         LocalDate max = LocalDate.parse(endDate, formatter);
-        assertTrue(now.isBefore(result) && result.isBefore(max));
+        Assertions.assertTrue(now.isBefore(result) && result.isBefore(max));
     }
 
     @Test
-    public void testFormatDate2() throws Exception {
+    void testFormatDate2() throws Exception {
         String endDate = "01012099";
         String formatDate = "ddMMyyyy";
         Collection<CompoundVariable> params = makeParams(formatDate, "", endDate, "", "");
@@ -108,7 +106,7 @@ public class TestTimeRandomDateFunction extends JMeterTestCase {
     }
 
     @Test
-    public void testFormatDate3() throws Exception {
+    void testFormatDate3() throws Exception {
         String startDate = "29 Aug 2111";
         String endDate = "30 Aug 2111";
         String formatDate = "dd MMM yyyy";
@@ -116,11 +114,11 @@ public class TestTimeRandomDateFunction extends JMeterTestCase {
         Collection<CompoundVariable> params = makeParams(formatDate, startDate, endDate, localeAsString, "");
         function.setParameters(params);
         value = function.execute(result, null);
-        assertThat(value, is(equalTo("29 Aug 2111")));
+        assertEquals("29 Aug 2111", value);
     }
 
     @Test
-    public void testFrenchFormatDate() throws Exception {
+    void testFrenchFormatDate() throws Exception {
         String startDate = "29 mars 2111";
         String endDate = "30 mars 2111";
         String formatDate = "dd MMM yyyy";
@@ -128,11 +126,11 @@ public class TestTimeRandomDateFunction extends JMeterTestCase {
         Collection<CompoundVariable> params = makeParams(formatDate, startDate, endDate, localeAsString, "");
         function.setParameters(params);
         value = function.execute(result, null);
-        assertThat(value, is(equalTo("29 mars 2111")));
+        assertEquals("29 mars 2111", value);
     }
 
     @Test
-    public void testEmptyFormatDate() throws Exception {
+    void testEmptyFormatDate() throws Exception {
         String startDate = "2111-03-29";
         String endDate = "2111-03-30";
         String formatDate = "";
@@ -140,11 +138,11 @@ public class TestTimeRandomDateFunction extends JMeterTestCase {
         Collection<CompoundVariable> params = makeParams(formatDate, startDate, endDate, localeAsString, "");
         function.setParameters(params);
         value = function.execute(result, null);
-        assertThat(value, is(equalTo("2111-03-29")));
+        assertEquals("2111-03-29", value);
     }
 
     @Test
-    public void testEndDateBeforeStartDate() throws Exception {
+    void testEndDateBeforeStartDate() throws Exception {
         String startDate = "2111-03-29";
         String endDate = "2011-03-30";
         String formatDate = "";
@@ -152,11 +150,11 @@ public class TestTimeRandomDateFunction extends JMeterTestCase {
         Collection<CompoundVariable> params = makeParams(formatDate, startDate, endDate, localeAsString, "");
         function.setParameters(params);
         value = function.execute(result, null);
-        assertThat(value, is(equalTo("")));
+        assertEquals("", value);
     }
 
     @Test
-    public void testEndDateBeforeStartDateNullVariable() throws Exception {
+    void testEndDateBeforeStartDateNullVariable() throws Exception {
         String startDate = "2111-03-29";
         String endDate = "2111-03-30";
         String formatDate = "";
@@ -164,11 +162,11 @@ public class TestTimeRandomDateFunction extends JMeterTestCase {
         Collection<CompoundVariable> params = makeParams(formatDate, startDate, endDate, localeAsString, null);
         function.setParameters(params);
         value = function.execute(result, null);
-        assertThat(value, is(equalTo("2111-03-29")));
+        assertEquals("2111-03-29", value);
     }
 
     @Test
-    public void testEndDateBeforeStartDateWithVariable() throws Exception {
+    void testEndDateBeforeStartDateWithVariable() throws Exception {
         String startDate = "2111-03-29";
         String endDate = "2111-03-30";
         String formatDate = "";
@@ -176,12 +174,12 @@ public class TestTimeRandomDateFunction extends JMeterTestCase {
         Collection<CompoundVariable> params = makeParams(formatDate, startDate, endDate, localeAsString, "MY_VAR");
         function.setParameters(params);
         value = function.execute(result, null);
-        assertThat(value, is(equalTo("2111-03-29")));
-        assertThat(vars.get("MY_VAR"), is(equalTo("2111-03-29")));
+        assertEquals("2111-03-29", value);
+        assertEquals("2111-03-29", vars.get("MY_VAR"));
     }
 
     @Test
-    public void testInvalidFormat() throws Exception {
+    void testInvalidFormat() throws Exception {
         String startDate = "2111-03-29";
         String endDate = "2011-03-30";
         String formatDate = "abcd";
@@ -189,11 +187,11 @@ public class TestTimeRandomDateFunction extends JMeterTestCase {
         Collection<CompoundVariable> params = makeParams(formatDate, startDate, endDate, localeAsString, "");
         function.setParameters(params);
         value = function.execute(result, null);
-        assertThat(value, is(equalTo("")));
+        assertEquals("", value);
     }
 
     @Test
-    public void testInvalidStartDateFormat() throws Exception {
+    void testInvalidStartDateFormat() throws Exception {
         String startDate = "23-2111-03";
         String endDate = "2011-03-30";
         String formatDate = "abcd";
@@ -201,11 +199,11 @@ public class TestTimeRandomDateFunction extends JMeterTestCase {
         Collection<CompoundVariable> params = makeParams(formatDate, startDate, endDate, localeAsString, "");
         function.setParameters(params);
         value = function.execute(result, null);
-        assertThat(value, is(equalTo("")));
+        assertEquals("", value);
     }
 
     @Test
-    public void testInvalidEndDateFormat() throws Exception {
+    void testInvalidEndDateFormat() throws Exception {
         String startDate = "2011-03-30";
         String endDate = "23-2111-03";
         String formatDate = "abcd";
@@ -213,6 +211,6 @@ public class TestTimeRandomDateFunction extends JMeterTestCase {
         Collection<CompoundVariable> params = makeParams(formatDate, startDate, endDate, localeAsString, "");
         function.setParameters(params);
         value = function.execute(result, null);
-        assertThat(value, is(equalTo("")));
+        assertEquals("", value);
     }
 }

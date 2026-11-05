@@ -23,6 +23,9 @@ import org.apache.jmeter.services.FileServer;
 import org.apache.jmeter.testelement.TestCloneable;
 import org.apache.jmeter.testelement.TestElement;
 
+import com.google.auto.service.AutoService;
+
+@AutoService(LogParser.class)
 public class SharedTCLogParser extends TCLogParser implements TestCloneable {
 
     public SharedTCLogParser() {
@@ -79,7 +82,7 @@ public class SharedTCLogParser extends TCLogParser implements TestCloneable {
             // BufferedReader
             line = breader.readLine(FILENAME);
             while (line != null) {
-                if (line.length() > 0) {
+                if (!line.isEmpty()) {
                     actualCount += this.parseLine(line, el);
                 }
                 // we check the count to see if we have exceeded

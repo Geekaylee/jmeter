@@ -36,11 +36,14 @@ import org.apache.jmeter.util.JMeterUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.auto.service.AutoService;
+
 /**
  * A function which understands Commons JEXL2
  * @since 2.6
  */
 // For unit tests, see TestJexlFunction
+@AutoService(Function.class)
 public class Jexl2Function extends AbstractFunction implements ThreadListener {
 
     private static final Logger log = LoggerFactory.getLogger(Jexl2Function.class);
@@ -97,7 +100,7 @@ public class Jexl2Function extends AbstractFunction implements ThreadListener {
             {
                 str = o.toString();
             }
-            if (vars != null && varName.length() > 0) {// vars will be null on TestPlan
+            if (vars != null && !varName.isEmpty()) {// vars will be null on TestPlan
                 vars.put(varName, str);
             }
         } catch (Exception e)

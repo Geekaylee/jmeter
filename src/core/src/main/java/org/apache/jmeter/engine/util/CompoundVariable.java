@@ -22,6 +22,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.ServiceLoader;
 
 import org.apache.jmeter.functions.Function;
 import org.apache.jmeter.functions.InvalidVariableException;
@@ -30,7 +31,8 @@ import org.apache.jmeter.samplers.Sampler;
 import org.apache.jmeter.threads.JMeterContext;
 import org.apache.jmeter.threads.JMeterContextService;
 import org.apache.jmeter.util.JMeterUtils;
-import org.apache.jorphan.reflect.ClassFinder;
+import org.apache.jorphan.reflect.LogAndIgnoreServiceLoadExceptionHandler;
+import org.apache.jorphan.util.StringUtilities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,15 +71,15 @@ public class CompoundVariable implements Function {
                 log.info("Note: Function class names must not contain the string: '{}'", notContain);
             }
 
-            List<String> classes = ClassFinder.findClassesThatExtend(JMeterUtils.getSearchPaths(),
-                    new Class[] { Function.class }, true, contain, notContain);
-            for (String clazzName : classes) {
-                Function tempFunc = Class.forName(clazzName)
-                        .asSubclass(Function.class)
-                        .getDeclaredConstructor().newInstance();
-                String referenceKey = tempFunc.getReferenceKey();
-                if (referenceKey.length() > 0) { // ignore self
-                    functions.put(referenceKey, tempFunc.getClass());
+            for (Function function : JMeterUtils.loadServicesAndScanJars(
+                    Function.class,
+                    ServiceLoader.load(Function.class),
+                    Thread.currentThread().getContextClassLoader(),
+                    new LogAndIgnoreServiceLoadExceptionHandler(log)
+            )) {
+                String referenceKey = function.getReferenceKey();
+                if (!referenceKey.isEmpty()) { // ignore self
+                    functions.put(referenceKey, function.getClass());
                 }
             }
 
@@ -133,15 +135,15 @@ public class CompoundVariable implements Function {
 
         StringBuilder results = new StringBuilder();
         for (Object item : compiledComponents) {
-            if (item instanceof Function) {
+            if (item instanceof Function function) {
                 try {
-                    results.append(((Function) item).execute(previousResult, currentSampler));
+                    results.append(function.execute(previousResult, currentSampler));
                 } catch (InvalidVariableException e) {
                     // TODO should level be more than debug ?
                     log.debug("Invalid variable: {}", item, e);
                 }
-            } else if (item instanceof SimpleVariable) {
-                results.append(((SimpleVariable) item).toString());
+            } else if (item instanceof SimpleVariable simpleVariable) {
+                results.append(simpleVariable.toString());
             } else {
                 results.append(item);
             }
@@ -176,7 +178,7 @@ public class CompoundVariable implements Function {
 
     public void setParameters(String parameters) throws InvalidVariableException {
         this.rawParameters = parameters;
-        if (parameters == null || parameters.length() == 0) {
+        if (StringUtilities.isEmpty(parameters)) {
             return;
         }
 

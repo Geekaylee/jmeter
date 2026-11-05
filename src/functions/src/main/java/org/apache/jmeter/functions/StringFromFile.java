@@ -20,13 +20,12 @@ package org.apache.jmeter.functions;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.jmeter.engine.util.CompoundVariable;
 import org.apache.jmeter.samplers.SampleResult;
 import org.apache.jmeter.samplers.Sampler;
@@ -34,8 +33,11 @@ import org.apache.jmeter.testelement.TestStateListener;
 import org.apache.jmeter.threads.JMeterVariables;
 import org.apache.jmeter.util.JMeterUtils;
 import org.apache.jorphan.util.JMeterStopThreadException;
+import org.apache.jorphan.util.JOrphanUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.auto.service.AutoService;
 
 /**
  * <p>StringFromFile Function to read a String from a text file.</p>
@@ -70,6 +72,7 @@ import org.slf4j.LoggerFactory;
  * Because function instances are shared, it does not make sense to use the thread number as part of the file name.
  * @since 1.9
  */
+@AutoService(Function.class)
 public class StringFromFile extends AbstractFunction implements TestStateListener {
     private static final Logger log = LoggerFactory.getLogger(StringFromFile.class);
 
@@ -122,7 +125,7 @@ public class StringFromFile extends AbstractFunction implements TestStateListene
 
     public StringFromFile() {
         if (log.isDebugEnabled()) {
-            log.debug("++++++++ Construct {}" + this);
+            log.debug("++++++++ Construct {}", this);
         }
     }
 
@@ -147,9 +150,8 @@ public class StringFromFile extends AbstractFunction implements TestStateListene
         String tn = Thread.currentThread().getName();
         fileName = ((CompoundVariable) values[0]).execute();
 
-        String start = "";
         if (values.length >= PARAM_START) {
-            start = ((CompoundVariable) values[PARAM_START - 1]).execute();
+            String start = ((CompoundVariable) values[PARAM_START - 1]).execute();
             try {
                 // Low chances to be non numeric, we parse
                 myStart = Integer.parseInt(start);
@@ -210,10 +212,10 @@ public class StringFromFile extends AbstractFunction implements TestStateListene
 
         log.info("{} opening file {}", tn, fileName);//$NON-NLS-1$
         try {
-            myBread = Files.newBufferedReader(Paths.get(fileName));
+            myBread = Files.newBufferedReader(Path.of(fileName));
         } catch (Exception e) {
-            log.error("openFile() error: {}", e.toString());//$NON-NLS-1$
-            IOUtils.closeQuietly(myBread, null);
+            log.error("openFile() error", e);//$NON-NLS-1$
+            JOrphanUtils.closeQuietly(myBread);
             myBread = null;
         }
     }
@@ -271,7 +273,7 @@ public class StringFromFile extends AbstractFunction implements TestStateListene
             }
         }
 
-        if (myName.length() > 0) {
+        if (!myName.isEmpty()) {
             JMeterVariables vars = getVariables();
             if (vars != null) {// Can be null if called from Config item testEnded() method
                 vars.put(myName, myValue);
@@ -294,7 +296,7 @@ public class StringFromFile extends AbstractFunction implements TestStateListene
         checkParameterCount(parameters, MIN_PARAM_COUNT, MAX_PARAM_COUNT);
         values = parameters.toArray();
 
-        StringBuilder sb = new StringBuilder(40);
+        var sb = new StringBuilder(40);
         sb.append("setParameters(");//$NON-NLS-1$
         for (int i = 0; i < values.length; i++) {
             if (i > 0) {

@@ -19,6 +19,7 @@ package org.apache.jmeter.protocol.http.sampler;
 
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
+import java.io.IOException;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
@@ -56,7 +57,7 @@ import com.github.tomakehurst.wiremock.client.WireMock;
 @ExtendWith(JMeterContextExtension.class)
 public class ParallelResourcesAndIpSource {
 
-    private void configureStubs(WireMockServer server) {
+    private static void configureStubs(WireMockServer server) {
         server.stubFor(WireMock.get("/index.html")
                 .willReturn(WireMock.aResponse()
                         .withHeader("Content-Type", "text/html; encoding=utf-8")
@@ -114,15 +115,20 @@ public class ParallelResourcesAndIpSource {
                     // with the given source IP
                     continue;
                 }
+                try {
+                    if (!InetAddress.getByName(targetHost).isReachable(100)) {
+                        continue;
+                    }
+                } catch (IOException e) {
+                    continue;
+                }
 
-                localIps.forEach(localIp -> {
-                    if (finalLocal4 != null) {
-                        res.add(arguments(impl, targetHost, finalLocal4));
-                    }
-                    if (finalLocal6 != null) {
-                        res.add(arguments(impl, targetHost, finalLocal6));
-                    }
-                });
+                if (finalLocal4 != null) {
+                    res.add(arguments(impl, targetHost, finalLocal4));
+                }
+                if (finalLocal6 != null) {
+                    res.add(arguments(impl, targetHost, finalLocal6));
+                }
             }
         }
         return res;
@@ -152,7 +158,10 @@ public class ParallelResourcesAndIpSource {
         http.setPath("/index.html");
         http.setFollowRedirects(true);
         http.setUseKeepAlive(true);
-        http.setProperty(new FunctionProperty(HTTPSampler.IP_SOURCE, new CompoundVariable("${IP_ADDR}")));
+        http.setProperty(
+                new FunctionProperty(
+                        HTTPSamplerBaseSchema.INSTANCE.getIpSource().getName(),
+                        new CompoundVariable("${IP_ADDR}")));
         http.setImageParser(true);
         http.setConcurrentDwn(true);
         http.setConcurrentPool("6");
@@ -192,26 +201,28 @@ public class ParallelResourcesAndIpSource {
         }
 
         String expected =
-                "url: http://wiremock/index.html\n" +
-                        "response: OK\n" +
-                        "data.size: 85\n" +
-                        "data: <html><body><img src='image1.png'><img src='image2.png'><img src='image3.png'></body>\n" +
-                        "- url: http://wiremock/image1.png\n" +
-                        "  response: OK\n" +
-                        "  data.size: 8\n" +
-                        "  data: content1\n" +
-                        "- url: http://wiremock/image2.png\n" +
-                        "  response: OK\n" +
-                        "  data.size: 8\n" +
-                        "  data: content2\n" +
-                        "- url: http://wiremock/image3.png\n" +
-                        "  response: OK\n" +
-                        "  data.size: 8\n" +
-                        "  data: content3\n" +
-                        "- url: http://wiremock/index.html\n" +
-                        "  response: OK\n" +
-                        "  data.size: 85\n" +
-                        "  data: <html><body><img src='image1.png'><img src='image2.png'><img src='image3.png'></body>\n";
+                """
+                        url: http://wiremock/index.html
+                        response: OK
+                        data.size: 85
+                        data: <html><body><img src='image1.png'><img src='image2.png'><img src='image3.png'></body>
+                        - url: http://wiremock/image1.png
+                          response: OK
+                          data.size: 8
+                          data: content1
+                        - url: http://wiremock/image2.png
+                          response: OK
+                          data.size: 8
+                          data: content2
+                        - url: http://wiremock/image3.png
+                          response: OK
+                          data.size: 8
+                          data: content3
+                        - url: http://wiremock/index.html
+                          response: OK
+                          data.size: 85
+                          data: <html><body><img src='image1.png'><img src='image2.png'><img src='image3.png'></body>
+                        """;
         expected = expected.replace("http://wiremock", "http://" + targetHost + ":" + server.port());
         Assertions.assertEquals(
                 expected.replaceAll("\n", System.lineSeparator()),

@@ -21,14 +21,17 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Locale;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.engine.util.CompoundVariable;
 import org.apache.jmeter.samplers.SampleResult;
 import org.apache.jmeter.samplers.Sampler;
 import org.apache.jmeter.util.JMeterUtils;
+import org.apache.jorphan.util.StringUtilities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.auto.service.AutoService;
 
 /**
  * Change Case Function
@@ -44,6 +47,7 @@ import org.slf4j.LoggerFactory;
  * @since 4.0
  *
  */
+@AutoService(Function.class)
 public class ChangeCase extends AbstractFunction {
     private static final Logger LOGGER = LoggerFactory.getLogger(ChangeCase.class);
     private static final List<String> DESC = new ArrayList<>();
@@ -67,7 +71,7 @@ public class ChangeCase extends AbstractFunction {
         if (values.length > 1) {
             mode = values[1].execute();
         }
-        if(StringUtils.isEmpty(mode)){
+        if (StringUtilities.isEmpty(mode)){
             mode = ChangeCaseMode.UPPER.getName(); // default
         }
         String targetString = changeCase(originalString, mode);
@@ -76,27 +80,22 @@ public class ChangeCase extends AbstractFunction {
     }
 
     protected String changeCase(String originalString, String mode) {
-        String targetString = originalString;
         // mode is case insensitive, allow upper for example
-        ChangeCaseMode changeCaseMode = ChangeCaseMode.typeOf(mode.toUpperCase());
-        if (changeCaseMode != null) {
-            switch (changeCaseMode) {
-            case UPPER:
-                targetString = StringUtils.upperCase(originalString);
-                break;
-            case LOWER:
-                targetString = StringUtils.lowerCase(originalString);
-                break;
-            case CAPITALIZE:
-                targetString = StringUtils.capitalize(originalString);
-                break;
-            default:
-                // default not doing nothing to string
-            }
-        } else {
-            LOGGER.error("Unknown mode {}, returning {} unchanged", mode, targetString);
+        ChangeCaseMode changeCaseMode = ChangeCaseMode.typeOf(mode.toUpperCase(Locale.ROOT));
+        if (changeCaseMode == null) {
+            LOGGER.error("Unknown mode {}, returning {} unchanged", mode, originalString);
+            return originalString;
         }
-        return targetString;
+
+        if (originalString == null) {
+            return null;
+        }
+
+        return switch (changeCaseMode) {
+            case UPPER -> originalString.toUpperCase(Locale.ROOT);
+            case LOWER -> originalString.toLowerCase(Locale.ROOT);
+            case CAPITALIZE -> StringUtilities.capitalize(originalString);
+        };
     }
 
     @Override

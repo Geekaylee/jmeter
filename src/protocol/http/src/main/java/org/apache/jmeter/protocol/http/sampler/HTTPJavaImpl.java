@@ -17,7 +17,6 @@
 
 package org.apache.jmeter.protocol.http.sampler;
 
-import java.io.BufferedInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -34,7 +33,6 @@ import java.util.Map;
 import java.util.function.Predicate;
 import java.util.zip.GZIPInputStream;
 
-import org.apache.commons.io.input.CountingInputStream;
 import org.apache.jmeter.protocol.http.control.AuthManager;
 import org.apache.jmeter.protocol.http.control.Authorization;
 import org.apache.jmeter.protocol.http.control.CacheManager;
@@ -47,6 +45,8 @@ import org.apache.jmeter.testelement.property.CollectionProperty;
 import org.apache.jmeter.testelement.property.JMeterProperty;
 import org.apache.jmeter.util.JMeterUtils;
 import org.apache.jmeter.util.SSLManager;
+import org.apache.jorphan.io.CountingInputStream;
+import org.apache.jorphan.util.StringUtilities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -85,7 +85,7 @@ public class HTTPJavaImpl extends HTTPAbstractImpl {
      *
      * @param conn
      *            <code>URLConnection</code> to set headers on
-     * @exception IOException
+     * @throws IOException
      *                if an I/O exception occurs
      */
     protected void setPostHeaders(URLConnection conn) throws IOException {
@@ -105,7 +105,7 @@ public class HTTPJavaImpl extends HTTPAbstractImpl {
      * @param connection
      *            <code>URLConnection</code> where POST data should be sent
      * @return a String show what was posted. Will not contain actual file upload content
-     * @exception IOException
+     * @throws IOException
      *                if an I/O exception occurs
      */
     protected String sendPostData(URLConnection connection) throws IOException {
@@ -130,7 +130,7 @@ public class HTTPJavaImpl extends HTTPAbstractImpl {
      * @param res
      *            sample result to save request infos to
      * @return <code>HttpURLConnection</code> ready for .connect
-     * @exception IOException
+     * @throws IOException
      *                if an I/O Exception occurs
      */
     protected HttpURLConnection setupConnection(URL u, String method, HTTPSampleResult res) throws IOException {
@@ -146,7 +146,7 @@ public class HTTPJavaImpl extends HTTPAbstractImpl {
         final HttpURLConnection conn;
         final String proxyHost = getProxyHost();
         final int proxyPort = getProxyPortInt();
-        if (proxyHost.length() > 0 && proxyPort > 0){
+        if (!proxyHost.isEmpty() && proxyPort > 0){
             Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(proxyHost, proxyPort));
             //TODO - how to define proxy authentication for a single connection?
             conn = (HttpURLConnection) u.openConnection(proxy);
@@ -204,7 +204,7 @@ public class HTTPJavaImpl extends HTTPAbstractImpl {
 
         if (res != null) {
             res.setRequestHeaders(getAllHeadersExceptCookie(conn, securityHeaders));
-            if(cookies != null && !cookies.isEmpty()) {
+            if (StringUtilities.isNotEmpty(cookies)) {
                 res.setCookies(cookies);
             } else {
                 // During recording Cookie Manager doesn't handle cookies
@@ -224,11 +224,11 @@ public class HTTPJavaImpl extends HTTPAbstractImpl {
      * @param res
      *            {@link SampleResult} to read response into
      * @return response content
-     * @exception IOException
+     * @throws IOException
      *                if an I/O exception occurs
      */
     protected byte[] readResponse(HttpURLConnection conn, SampleResult res) throws IOException {
-        BufferedInputStream in;
+        InputStream in;
 
         final long contentLength = conn.getContentLength();
         if ((contentLength == 0)
@@ -241,13 +241,14 @@ public class HTTPJavaImpl extends HTTPAbstractImpl {
 
         // works OK even if ContentEncoding is null
         boolean gzipped = HTTPConstants.ENCODING_GZIP.equals(conn.getContentEncoding());
+
         CountingInputStream instream = null;
         try {
             instream = new CountingInputStream(conn.getInputStream());
             if (gzipped) {
-                in = new BufferedInputStream(new GZIPInputStream(instream));
+                in = new GZIPInputStream(instream);
             } else {
-                in = new BufferedInputStream(instream);
+                in = instream;
             }
         } catch (IOException e) {
             if (! (e.getCause() instanceof FileNotFoundException))
@@ -256,8 +257,8 @@ public class HTTPJavaImpl extends HTTPAbstractImpl {
                 Throwable cause = e.getCause();
                 if (cause != null){
                     log.error("Cause: {}", cause.toString());
-                    if(cause instanceof Error) {
-                        throw (Error)cause;
+                    if(cause instanceof Error error) {
+                        throw error;
                     }
                 }
             }
@@ -277,25 +278,25 @@ public class HTTPJavaImpl extends HTTPAbstractImpl {
             }
 
             if (gzipped) {
-                in = new BufferedInputStream(new GZIPInputStream(errorStream));
+                in = new GZIPInputStream(errorStream);
             } else {
-                in = new BufferedInputStream(errorStream);
+                in = errorStream;
             }
         } catch (Exception e) {
             log.error("readResponse: {}", e.toString());
             Throwable cause = e.getCause();
             if (cause != null){
                 log.error("Cause: {}", cause.toString());
-                if(cause instanceof Error) {
-                    throw (Error)cause;
+                if(cause instanceof Error error) {
+                    throw error;
                 }
             }
-            in = new BufferedInputStream(conn.getErrorStream());
+            in = conn.getErrorStream();
         }
         // N.B. this closes 'in'
         byte[] responseData = readResponse(res, in, contentLength);
         if (instream != null) {
-            res.setBodySize(instream.getByteCount());
+            res.setBodySize(instream.getBytesRead());
             instream.close();
         }
         return responseData;
@@ -336,7 +337,7 @@ public class HTTPJavaImpl extends HTTPAbstractImpl {
      *            the <code>CookieManager</code> containing all the cookies
      *            for this <code>UrlConfig</code>
      */
-    private String setConnectionCookie(HttpURLConnection conn, URL u, CookieManager cookieManager) {
+    private static String setConnectionCookie(HttpURLConnection conn, URL u, CookieManager cookieManager) {
         String cookieHeader = null;
         if (cookieManager != null) {
             cookieHeader = cookieManager.getCookieHeaderForURL(u);
@@ -361,7 +362,7 @@ public class HTTPJavaImpl extends HTTPAbstractImpl {
      *            for this <code>UrlConfig</code>
      * @param cacheManager the CacheManager (may be null)
      */
-    private void setConnectionHeaders(HttpURLConnection conn, URL u,
+    private static void setConnectionHeaders(HttpURLConnection conn, URL u,
             HeaderManager headerManager, CacheManager cacheManager) {
         // Add all the headers from the HeaderManager
         Header[] arrayOfHeaders = null;
@@ -393,7 +394,7 @@ public class HTTPJavaImpl extends HTTPAbstractImpl {
      * @param securityHeaders Map of security Header
      * @return the headers as a string
      */
-    private String getOnlyCookieFromHeaders(HttpURLConnection conn, Map<String, String> securityHeaders) {
+    private static String getOnlyCookieFromHeaders(HttpURLConnection conn, Map<String, String> securityHeaders) {
         String cookieHeader= getFromConnectionHeaders(conn, securityHeaders, ONLY_COOKIE, false).trim();
         if(!cookieHeader.isEmpty()) {
             return cookieHeader.substring(HTTPConstants.HEADER_COOKIE_IN_REQUEST.length()).trim();
@@ -410,7 +411,7 @@ public class HTTPJavaImpl extends HTTPAbstractImpl {
      * @param securityHeaders Map of security Header
      * @return the headers as a string
      */
-    private String getAllHeadersExceptCookie(HttpURLConnection conn, Map<String, String> securityHeaders) {
+    private static String getAllHeadersExceptCookie(HttpURLConnection conn, Map<String, String> securityHeaders) {
         return getFromConnectionHeaders(conn, securityHeaders, ALL_EXCEPT_COOKIE, true);
     }
 
@@ -424,8 +425,8 @@ public class HTTPJavaImpl extends HTTPAbstractImpl {
      * @param predicate {@link Predicate}
      * @return the headers as a string
      */
-    private String getFromConnectionHeaders(HttpURLConnection conn, Map<String, String> securityHeaders,
-            Predicate<String> predicate, boolean addSecurityHeaders) {
+    private static String getFromConnectionHeaders(HttpURLConnection conn, Map<String, String> securityHeaders,
+            Predicate<? super String> predicate, boolean addSecurityHeaders) {
         // Get all the request properties, which are the headers set on the connection
         StringBuilder hdrs = new StringBuilder(100);
         Map<String, List<String>> requestHeaders = conn.getRequestProperties();
@@ -465,7 +466,7 @@ public class HTTPJavaImpl extends HTTPAbstractImpl {
      *            this <code>UrlConfig</code>
      * @return String Authorization header value or null if not set
      */
-    private Map<String, String> setConnectionAuthorization(HttpURLConnection conn, URL u, AuthManager authManager) {
+    private static Map<String, String> setConnectionAuthorization(HttpURLConnection conn, URL u, AuthManager authManager) {
         if (authManager != null) {
             Authorization auth = authManager.getAuthForURL(u);
             if (auth != null) {
@@ -617,8 +618,13 @@ public class HTTPJavaImpl extends HTTPAbstractImpl {
             }
 
             // record headers size to allow HTTPSampleResult.getBytes() with different options
-            res.setHeadersSize(responseHeaders.replaceAll("\n", "\r\n") // $NON-NLS-1$ $NON-NLS-2$
-                    .length() + 2); // add 2 for a '\r\n' at end of headers (before data)
+            // It used to be responseHeaders.replaceAll("\n", "\r\n").length(),
+            // however we don't need the resulting string, just the length
+            // So we add the number of \n in the string to account for \n
+            res.setHeadersSize(
+                    responseHeaders.length()
+                            + StringUtilities.count(responseHeaders, '\n')
+                            + 2); // add 2 for a '\r\n' at end of headers (before data)
             if (log.isDebugEnabled()) {
                 log.debug("Response headersSize={}, bodySize={}, Total={}",
                         res.getHeadersSize(),  res.getBodySizeAsLong(),
@@ -662,7 +668,7 @@ public class HTTPJavaImpl extends HTTPAbstractImpl {
         }
     }
 
-    private Header[] getHeaders(HeaderManager headerManager) {
+    private static Header[] getHeaders(HeaderManager headerManager) {
         if (headerManager != null) {
             final CollectionProperty headers = headerManager.getHeaders();
             if (headers != null) {
@@ -700,7 +706,7 @@ public class HTTPJavaImpl extends HTTPAbstractImpl {
      *            the <code>CookieManager</code> containing all the cookies
      *            for this <code>UrlConfig</code>
      */
-    private void saveConnectionCookies(HttpURLConnection conn, URL u, CookieManager cookieManager) {
+    private static void saveConnectionCookies(HttpURLConnection conn, URL u, CookieManager cookieManager) {
         if (cookieManager != null) {
             for (int i = 1; conn.getHeaderFieldKey(i) != null; i++) {
                 if (conn.getHeaderFieldKey(i).equalsIgnoreCase(HTTPConstants.HEADER_SET_COOKIE)) {

@@ -53,10 +53,16 @@ import org.apache.jorphan.gui.ComponentUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.auto.service.AutoService;
+
 /**
  * Export transactions names for web report
  * @since 3.3
  */
+@AutoService({
+        Command.class,
+        MenuCreator.class
+})
 public class ExportTransactionAndSamplerNames extends AbstractAction implements MenuCreator {
     private static final Logger log = LoggerFactory.getLogger(ExportTransactionAndSamplerNames.class);
 
@@ -80,8 +86,8 @@ public class ExportTransactionAndSamplerNames extends AbstractAction implements 
      * Visitor to collect nodes matching the name
      */
     private static class SamplerAndTransactionNameVisitor implements HashTreeTraverser {
-        private Set<String> listOfTransactions = new TreeSet<>();
-        public SamplerAndTransactionNameVisitor() {
+        private final Set<String> listOfTransactions = new TreeSet<>();
+        private SamplerAndTransactionNameVisitor() {
             super();
         }
         @Override
@@ -107,10 +113,11 @@ public class ExportTransactionAndSamplerNames extends AbstractAction implements 
         public void processPath() {
             // NOOP
         }
+
         /**
          * @return the listOfTransactions
          */
-        public Set<String> getListOfTransactions() {
+        private Set<String> getListOfTransactions() {
             return listOfTransactions;
         }
     }
@@ -157,7 +164,7 @@ public class ExportTransactionAndSamplerNames extends AbstractAction implements 
      * @param event {@link ActionEvent}
      * @param result String
      */
-    private final void showResult(ActionEvent event, String result) {
+    private static void showResult(ActionEvent event, String result) {
         EscapeDialog messageDialog = new EscapeDialog(getParentFrame(event),
                 JMeterUtils.getResString("export_transactions_title"), false); //$NON-NLS-1$
         Container contentPane = messageDialog.getContentPane();

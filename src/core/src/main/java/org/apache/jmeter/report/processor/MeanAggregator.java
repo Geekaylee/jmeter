@@ -26,43 +26,23 @@ import org.apache.commons.math3.stat.descriptive.moment.Mean;
  */
 public class MeanAggregator implements Aggregator {
 
-    private Mean mean = new Mean();
+    private final Mean mean = new Mean();
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see org.apache.jmeter.report.core.GraphAggregator#getCount()
-     */
     @Override
     public long getCount() {
         return mean.getN();
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see org.apache.jmeter.report.core.GraphAggregator#getResult()
-     */
     @Override
     public double getResult() {
         return mean.getResult();
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see org.apache.jmeter.report.core.GraphAggregator#addValue(double)
-     */
     @Override
     public void addValue(double value) {
         mean.increment(value);
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see org.apache.jmeter.report.core.GraphAggregator#reset()
-     */
     @Override
     public void reset() {
         mean.clear();

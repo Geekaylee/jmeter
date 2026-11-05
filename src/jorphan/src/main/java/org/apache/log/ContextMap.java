@@ -53,7 +53,7 @@ public final class ContextMap
     private final ContextMap m_parent;
 
     ///Container to hold map of elements
-    private Hashtable m_map = new Hashtable();
+    private final Hashtable m_map = new Hashtable();
 
     ///Flag indicating whether this map should be readonly
     private transient boolean m_readOnly;
@@ -217,18 +217,6 @@ public final class ContextMap
             m_map.put( key, value );
         }
     }
-
-    /**
-     * Retrieve keys of entries into context map.
-     *
-     * @return the keys of items in context
-     */
-    /*
-    public String[] getKeys()
-    {
-        return (String[])m_map.keySet().toArray( new String[ 0 ] );
-    }
-    */
 
     /**
      * Get the number of contexts in map.

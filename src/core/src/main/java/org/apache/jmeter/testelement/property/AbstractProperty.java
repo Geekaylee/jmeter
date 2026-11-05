@@ -17,10 +17,15 @@
 
 package org.apache.jmeter.testelement.property;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.jmeter.testelement.TestElement;
+import org.apache.jorphan.util.StringUtilities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -77,6 +82,9 @@ public abstract class AbstractProperty implements JMeterProperty {
     }
 
     protected PropertyIterator getIterator(Collection<JMeterProperty> values) {
+        if (values.isEmpty()) {
+            return PropertyIteratorImpl.EMPTY_ITERATOR;
+        }
         return new PropertyIteratorImpl(values);
     }
 
@@ -101,11 +109,11 @@ public abstract class AbstractProperty implements JMeterProperty {
     @Override
     public int getIntValue() {
         String val = getStringValue();
-        if (val == null || val.length()==0) {
+        if (StringUtilities.isEmpty(val)) {
             return 0;
         }
         try {
-            return Integer.parseInt(val);
+            return Integer.parseInt(val.trim());
         } catch (NumberFormatException e) {
             return 0;
         }
@@ -119,11 +127,11 @@ public abstract class AbstractProperty implements JMeterProperty {
     @Override
     public long getLongValue() {
         String val = getStringValue();
-        if (val == null || val.length()==0) {
+        if (StringUtilities.isEmpty(val)) {
             return 0;
         }
         try {
-            return Long.parseLong(val);
+            return Long.parseLong(val.trim());
         } catch (NumberFormatException e) {
             return 0;
         }
@@ -137,11 +145,11 @@ public abstract class AbstractProperty implements JMeterProperty {
     @Override
     public double getDoubleValue() {
         String val = getStringValue();
-        if (val == null || val.length()==0) {
+        if (StringUtilities.isEmpty(val)) {
             return 0;
         }
         try {
-            return Double.parseDouble(val);
+            return Double.parseDouble(val.trim());
         } catch (NumberFormatException e) {
             log.error("Tried to parse a non-number string to an integer", e);
             return 0;
@@ -156,11 +164,11 @@ public abstract class AbstractProperty implements JMeterProperty {
     @Override
     public float getFloatValue() {
         String val = getStringValue();
-        if (val == null || val.length()==0) {
+        if (StringUtilities.isEmpty(val)) {
             return 0;
         }
         try {
-            return Float.parseFloat(val);
+            return Float.parseFloat(val.trim());
         } catch (NumberFormatException e) {
             log.error("Tried to parse a non-number string to an integer", e);
             return 0;
@@ -175,10 +183,10 @@ public abstract class AbstractProperty implements JMeterProperty {
     @Override
     public boolean getBooleanValue() {
         String val = getStringValue();
-        if (val == null || val.length()==0) {
+        if (StringUtilities.isEmpty(val)) {
             return false;
         }
-        return Boolean.parseBoolean(val);
+        return Boolean.parseBoolean(val.trim());
     }
 
     /**
@@ -188,13 +196,12 @@ public abstract class AbstractProperty implements JMeterProperty {
      */
     @Override
     public boolean equals(Object o) {
-        if (!(o instanceof JMeterProperty)) {
+        if (!(o instanceof JMeterProperty jpo)) {
             return false;
         }
         if (this == o) {
             return true;
         }
-        JMeterProperty jpo = (JMeterProperty) o;
         if (!name.equals(jpo.getName())) {
             return false;
         }
@@ -268,18 +275,18 @@ public abstract class AbstractProperty implements JMeterProperty {
         if (item == null) {
             return new NullProperty();
         }
-        if (item instanceof String) {
-            return new StringProperty("", item.toString());
-        } else if (item instanceof Boolean) {
-            return new BooleanProperty("", (Boolean) item);
-        } else if (item instanceof Float) {
-            return new FloatProperty("", (Float) item);
-        } else if (item instanceof Double) {
-            return new DoubleProperty("", (Double) item);
-        } else if (item instanceof Integer) {
-            return new IntegerProperty("", (Integer) item);
-        } else if (item instanceof Long) {
-            return new LongProperty("", (Long) item);
+        if (item instanceof String str) {
+            return new StringProperty("", str);
+        } else if (item instanceof Boolean bool) {
+            return new BooleanProperty("", bool);
+        } else if (item instanceof Float floatVal) {
+            return new FloatProperty("", floatVal);
+        } else if (item instanceof Double doubleVal) {
+            return new DoubleProperty("", doubleVal);
+        } else if (item instanceof Integer intVal) {
+            return new IntegerProperty("", intVal);
+        } else if (item instanceof Long longVal) {
+            return new LongProperty("", longVal);
         } else {
             return new StringProperty("", item.toString());
         }
@@ -293,13 +300,26 @@ public abstract class AbstractProperty implements JMeterProperty {
      */
     protected Collection<JMeterProperty> normalizeList(Collection<?> coll) {
         try {
-            @SuppressWarnings("unchecked") // empty collection
-            Collection<JMeterProperty> newColl = coll.getClass().getDeclaredConstructor().newInstance();
+            Collection<JMeterProperty> newColl;
+            try {
+                @SuppressWarnings("unchecked")
+                Collection<JMeterProperty> tmp = coll.getClass().getDeclaredConstructor().newInstance();
+                newColl = tmp;
+            } catch (Exception e) {
+                if (coll instanceof List) {
+                    newColl = new ArrayList<>(coll.size());
+                } else if (coll instanceof Set) {
+                    newColl = new LinkedHashSet<>();
+                } else {
+                    throw e;
+                }
+            }
             for (Object item : coll) {
                 newColl.add(convertObject(item));
             }
             return newColl;
         } catch (Exception e) {// should not happen
+            // TODO: replace with throwing an error, however it might break backward compatibility
             log.error("Cannot create copy of {}", coll.getClass(), e);
             return null;
         }
@@ -321,8 +341,8 @@ public abstract class AbstractProperty implements JMeterProperty {
                 Object key = entry.getKey();
                 Object prop = entry.getValue();
                 String item=null;
-                if (key instanceof String) {
-                    item = (String) key;
+                if (key instanceof String keyStr) {
+                    item = keyStr;
                 } else {
                     if (key != null) {
                         log.error("Expected key type String, found: {}", key.getClass());
@@ -358,18 +378,17 @@ public abstract class AbstractProperty implements JMeterProperty {
      * @return the JMeterProperty
      */
     protected static JMeterProperty makeProperty(Object item) {
-        if (item instanceof JMeterProperty) {
-            return (JMeterProperty) item;
+        if (item instanceof JMeterProperty prop) {
+            return prop;
         }
-        if (item instanceof TestElement) {
-            return new TestElementProperty(((TestElement) item).getName(),
-                    (TestElement) item);
+        if (item instanceof TestElement testElement) {
+            return new TestElementProperty(testElement.getName(), testElement);
         }
-        if (item instanceof Collection<?>) {
-            return new CollectionProperty(Integer.toString(item.hashCode()), (Collection<?>) item);
+        if (item instanceof Collection<?> collection) {
+            return new CollectionProperty(Integer.toString(item.hashCode()), collection);
         }
-        if (item instanceof Map<?, ?>) {
-            return new MapProperty(Integer.toString(item.hashCode()), (Map<?, ?>) item);
+        if (item instanceof Map<?, ?> map) {
+            return new MapProperty(Integer.toString(item.hashCode()), map);
         }
         return null;
     }

@@ -95,8 +95,7 @@ public class XPathExtractorGui extends AbstractPostProcessorGui {
     @Override
     public void modifyTestElement(TestElement extractor) {
         super.configureTestElement(extractor);
-        if ( extractor instanceof XPathExtractor){
-            XPathExtractor xpath = (XPathExtractor)extractor;
+        if (extractor instanceof XPathExtractor xpath){
             saveScopeSettings(xpath);
             xpath.setDefaultValue(defaultField.getText());
             xpath.setRefName(refNameField.getText());
@@ -152,7 +151,7 @@ public class XPathExtractorGui extends AbstractPostProcessorGui {
         return panel;
     }
 
-    private void addField(JPanel panel, JLabeledTextField field, GridBagConstraints gbc) {
+    private static void addField(JPanel panel, JLabeledTextField field, GridBagConstraints gbc) {
         List<JComponent> item = field.getComponentList();
         panel.add(item.get(0), gbc.clone());
         gbc.gridx++;
@@ -161,14 +160,14 @@ public class XPathExtractorGui extends AbstractPostProcessorGui {
         panel.add(item.get(1), gbc.clone());
     }
 
-    private void resetContraints(GridBagConstraints gbc) {
+    private static void resetContraints(GridBagConstraints gbc) {
         gbc.gridx = 0;
         gbc.gridy++;
         gbc.weightx = 0;
         gbc.fill=GridBagConstraints.NONE;
     }
 
-    private void initConstraints(GridBagConstraints gbc) {
+    private static void initConstraints(GridBagConstraints gbc) {
         gbc.anchor = GridBagConstraints.NORTHWEST;
         gbc.fill = GridBagConstraints.NONE;
         gbc.gridheight = 1;
